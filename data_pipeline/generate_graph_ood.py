@@ -83,9 +83,9 @@ def generate_node_semantics(client, node_roles, is_ood=False):
         temperature=0.7,
     )
 
-    print(f"\n[导师探针] 正在向 Gemini 3.1 Pro 发送请求 (生成 {'OOD' if is_ood else 'ID'} 数据)...")
+    print(f"\n[导师探针] 正在向 Gemini 3.1 Flash 发送请求 (生成 {'OOD' if is_ood else 'ID'} 数据)...")
     response = client.models.generate_content(
-        model='gemini-3.1-pro',  # 🚀 核心替换：直接拉满，调用 3.1 Pro 引擎！
+        model='gemini-3.1-flash-lite-preview',  # ⚡ 启用 3.1 世代的极速轻量引擎
         contents=prompt,
         config=config,
     )
