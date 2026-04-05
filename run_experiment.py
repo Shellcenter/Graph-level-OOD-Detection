@@ -12,6 +12,9 @@ from sentence_transformers import SentenceTransformer
 
 def train_model():
     print(">>> 1. 初始化引擎与环境...")
+    # 探测是否有 GPU，统一设备空间
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[硬件探针] 当前正在使用的计算设备: {device}")
     client = genai.Client(api_key=API_KEY)
     text_encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
