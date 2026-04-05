@@ -1,134 +1,157 @@
 import os
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 import json
-from google import genai
-from google.genai import types
-from sentence_transformers import SentenceTransformer
+import networkx as nx
 import torch
 from torch_geometric.data import Data
+from sentence_transformers import SentenceTransformer
+from google import genai
+from google.genai import types
 
 # =====================================================================
-# [配置区] 填入你的 Gemini API 密钥
+# [导师配置区]：请务必修改这三个核心参数！
 # =====================================================================
-client = genai.Client(api_key="AIzaSyBwB5Vft5rqw8l87bl0e3KmUteacVqsY_A")
+PROXY_PORT = "9674"  # 替换为你的真实代理端口 (如 7890, 10808)
+API_KEY = "AIzaSyBwB5Vft5rqw8l87bl0e3KmUteacVqsY_A"
+DOMAIN_THEME = "Financial Transaction Network"  # 图的宏观背景，可改为"分子化学"或"计算机网络"
 
-print("正在加载文本编码器 (SentenceTransformer)...")
-encoder = SentenceTransformer('all-MiniLM-L6-v2')
-print("编码器加载完成！")
-
-# =====================================================================
-# [核心提示词] 强制 Gemini 遵守“角色驱动”与“拓扑锁定”
-# =====================================================================
-SYSTEM_PROMPT = """
-You are an expert graph data synthesizer for machine learning research. 
-Your task is to generate a realistic text-attributed graph based on a provided topological skeleton and a target 'Hard OOD (Out-of-Distribution) Label'.
-
-Rules for Generation:
-1. STRICT TOPOLOGY: You MUST preserve the exact 'num_nodes' and 'edges' from the input skeleton. Do not add or remove nodes/edges.
-2. ROLE-DRIVEN SEMANTICS: You must assign text attributes to each node based on its degree (connectivity):
-   - Central Nodes (High degree): Generate text representing core, generalized concepts related to the '{ood_label}'.
-   - Edge Nodes (Low degree): Generate text representing specific, derived, or granular details related to the central node's concept.
-3. OUTPUT FORMAT: You must strictly output valid JSON matching this schema:
-   {{
-     "nodes": [{{"id": int, "text": "string"}}],
-     "edges": [[int, int]]
-   }}
-"""
+# 强制网络接管 (防止网络黑洞)
+os.environ['http_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
+os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 
 # =====================================================================
-# [处理管道] 校验与张量化
+# 模块 1: 角色感知的拓扑骨架生成 (Skeleton Generator)
 # =====================================================================
-def validate_and_parse_graph(llm_graph, expected_nodes):
-    nodes = llm_graph.get('nodes', [])
-    edges = llm_graph.get('edges', [])
+def create_graph_skeleton(num_nodes=5):
+    """
+    生成一个具有中心-边缘结构的星型/无标度拓扑图。
+    这里为了演示清晰，生成一个经典的 5 节点星型网络：
+    Node 0 是绝对的中心 (Degree=4)，其余是边缘节点 (Degree=1)
+    """
+    G = nx.star_graph(num_nodes - 1)
 
-    if len(nodes) != expected_nodes:
-        raise ValueError(f"节点数量不符！期望 {expected_nodes}，实际返回 {len(nodes)}")
-
-    sorted_nodes = sorted(nodes, key=lambda x: x['id'])
-    texts = [n['text'] for n in sorted_nodes]
-    x = encoder.encode(texts, convert_to_tensor=True)
-
-    valid_edges = []
-    for u, v in edges:
-        if 0 <= u < expected_nodes and 0 <= v < expected_nodes:
-            valid_edges.extend([[u, v], [v, u]])
+    # 提取节点角色 (按度数)
+    node_roles = {}
+    for node, degree in G.degree():
+        if degree > 1:
+            node_roles[node] = f"Central Hub (Degree: {degree})"
         else:
-            raise ValueError(f"边越界: [{u}, {v}]")
+            node_roles[node] = f"Edge Node (Degree: {degree})"
 
-    if not valid_edges:
-        edge_index = torch.empty((2, 0), dtype=torch.long)
-    else:
-        edge_index = torch.tensor(valid_edges, dtype=torch.long).t().contiguous()
+    # 转换为 PyG 的 edge_index (2 x E 张量)
+    edges = list(G.edges())
+    # 无向图需要双向边
+    edges.extend([(v, u) for u, v in edges])
+    edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
 
-    print("\n[导师质检] Gemini 为不同度数节点生成的语义文本:")
-    for i, txt in enumerate(texts):
-        print(f"Node {i}: {txt}")
-    print("-" * 50 + "\n")
-
-    return Data(x=x, edge_index=edge_index)
+    return edge_index, node_roles
 
 
 # =====================================================================
-# [引擎唤醒区] 带有最高级别 Debug 探针与强制 JSON 约束
+# 模块 2: 基于 Gemini 的拓扑-语义解耦生成 (Semantic Injector)
 # =====================================================================
-def generate_single_ood_graph(skeleton_dict, ood_label):
-    prompt = f"Target Hard OOD Label: {ood_label}\nInput Skeleton: {json.dumps(skeleton_dict)}"
+def generate_node_semantics(client, node_roles, is_ood=False):
+    """
+    核心逻辑：角色驱动的语义注入。
+    如果是 ID 图：所有节点都生成正常的背景文本。
+    如果是 Hard OOD 图：中心节点正常，但悄悄篡改边缘节点的语义！
+    """
+    # 构建严格的系统提示词
+    condition = "OUT-OF-DISTRIBUTION (Hard OOD)" if is_ood else "IN-DISTRIBUTION (Normal ID)"
+    ood_instruction = ""
+    if is_ood:
+        ood_instruction = "CRITICAL: Secretly inject severely conflicting anomalies (e.g., money laundering, crypto-scam, illegal dark web routing) ONLY into the 'Edge Node' descriptions. Keep 'Central Hub' absolutely normal to create a high-camouflage anomaly."
 
+    prompt = f"""
+    You are an expert Graph Data Synthesizer.
+    Task: Generate node descriptions for a {DOMAIN_THEME}.
+    Condition: This graph must be {condition}.
+
+    Node Roles provided below:
+    {json.dumps(node_roles, indent=2)}
+
+    Rules:
+    1. STRICT TOPOLOGY: You must generate EXACTLY one text description for each node ID provided.
+    2. ROLE-DRIVEN: The 'Central Hub' should describe macro-level, core structural concepts. The 'Edge Nodes' should describe specific, granular behaviors.
+    3. {ood_instruction}
+    4. OUTPUT FORMAT: Respond ONLY with a valid JSON dictionary mapping node IDs (as strings) to their text descriptions. No markdown blocks, no other text.
+    """
+
+    config = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        temperature=0.7,
+    )
+
+    print(f"\n[导师探针] 正在向 Gemini 3.1 Pro 发送请求 (生成 {'OOD' if is_ood else 'ID'} 数据)...")
+    response = client.models.generate_content(
+        model='gemini-3.1-pro',  # 🚀 核心替换：直接拉满，调用 3.1 Pro 引擎！
+        contents=prompt,
+        config=config,
+    )
+    print("[导师探针] ⚡ 云端响应成功！")
+
+    # 解析 JSON
     try:
-        # 强制 API 层面锁定 JSON 输出格式
-        config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT.format(ood_label=ood_label),
-            response_mime_type="application/json",  # 物理封锁 Markdown 幻觉
-            temperature=0.7,
-        )
+        text_data = json.loads(response.text)
+        return text_data
+    except json.JSONDecodeError:
+        raise ValueError("Gemini 未返回合法的 JSON，解析失败！请重试。")
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',  # 升级为最新一代引擎
-            contents=prompt,
-            config=config,
-        )
-
-        # --- 【最高级别 Debug 探针】无条件拦截原始数据 ---
-        raw_text = response.text
-        print("\n" + "▼" * 50)
-        print("[大模型原始返回数据裸眼审查 - 导师专用]")
-        print(raw_text)
-        print("▲" * 50 + "\n")
-
-        # 容错清洗
-        cleaned_text = raw_text.strip()
-        if cleaned_text.startswith("```"):
-            cleaned_text = cleaned_text.strip("` \n")
-            if cleaned_text.lower().startswith("json"):
-                cleaned_text = cleaned_text[4:].strip()
-
-        llm_output = json.loads(cleaned_text)
-        return validate_and_parse_graph(llm_output, skeleton_dict['num_nodes'])
-
-    except Exception as e:
-        # 精准捕获错误类型
-        print(f"\n[致命报错拦截] 错误类型: {type(e).__name__}")
-        print(f"错误详情: {e}")
-        return None
 
 # =====================================================================
-# [点火测试]
+# 模块 3: 文本编码与 PyG 图构建 (Tensor Encoder)
+# =====================================================================
+def build_pyg_data(edge_index, text_data, encoder, y_label):
+    """
+    将大模型生成的文本转化为特征张量，并打包为 PyG Data 对象
+    """
+    # 按照节点顺序 0, 1, 2... 提取文本
+    num_nodes = edge_index.max().item() + 1
+    texts = [text_data[str(i)] for i in range(num_nodes)]
+
+    # 文本转张量
+    print(f"[张量引擎] 正在使用 SentenceTransformer 编码 {num_nodes} 个节点的语义...")
+    x = encoder.encode(texts, convert_to_tensor=True)  # [num_nodes, embed_dim]
+
+    # 构建 Data 对象
+    y = torch.tensor([y_label], dtype=torch.long)  # 0 for ID, 1 for OOD
+    data = Data(x=x, edge_index=edge_index, y=y)
+    data.raw_texts = texts  # 顺便保存原始文本方便以后可视化
+
+    return data
+
+
+# =====================================================================
+# 主流程：点火运行
 # =====================================================================
 if __name__ == "__main__":
-    mock_skeleton = {
-        "num_nodes": 4,
-        "edges": [[0, 1], [0, 2], [1, 3]],
-        "node_degrees": {"0": 2, "1": 2, "2": 1, "3": 1}
-    }
+    print(">>> 启动图级 OOD 数据生成管道...")
 
-    target_label = "Quantum Cryptography"
-    print(">>> 启动 Gemini 原生图级数据生成管道...")
+    # 1. 初始化客户端和模型
+    gemini_client = genai.Client(api_key=API_KEY)
+    text_encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-    pyg_data = generate_single_ood_graph(mock_skeleton, target_label)
+    # 2. 生成物理骨架 (固定)
+    edge_index, node_roles = create_graph_skeleton(num_nodes=5)
+    print("\n--- 图拓扑骨架已生成 ---")
+    for k, v in node_roles.items():
+        print(f"Node {k}: {v}")
 
-    if pyg_data:
-        print(f">>> 成功！最终生成的 PyG 图数据结构: {pyg_data}")
-        print(f"特征矩阵 X 维度: {pyg_data.x.shape}")
-        print(f"边表 Edge Index 维度: {pyg_data.edge_index.shape}")
+    # 3. 合成 ID 图 (标签 0)
+    print("\n================ [开始合成分布内 (ID) 图] ================")
+    id_texts = generate_node_semantics(gemini_client, node_roles, is_ood=False)
+    id_data = build_pyg_data(edge_index, id_texts, text_encoder, y_label=0)
+    print(f"✅ ID 图构建完成！特征维度: {id_data.x.shape}")
+
+    # 4. 合成 Hard OOD 图 (标签 1)
+    print("\n================ [开始合成分布外 (Hard OOD) 图] ================")
+    ood_texts = generate_node_semantics(gemini_client, node_roles, is_ood=True)
+    ood_data = build_pyg_data(edge_index, ood_texts, text_encoder, y_label=1)
+    print(f"✅ OOD 图构建完成！特征维度: {ood_data.x.shape}")
+
+    # 5. 学术验收：打印 OOD 图的篡改文本
+    print("\n🔍 [学术验收] Hard OOD 图的节点语义：")
+    for i in range(5):
+        prefix = "🔴 [边缘变异]" if i > 0 else "🟢 [中心正常]"
+        print(f"Node {i} {prefix}: {ood_data.raw_texts[i]}")
