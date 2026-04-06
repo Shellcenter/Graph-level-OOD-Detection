@@ -51,8 +51,8 @@ def train_model():
             batch_index = torch.zeros(data.x.size(0), dtype=torch.long).to(device)
 
             logits, alphas = model(data.x, data.edge_index, batch_index)
-            loss = criterion(logits, data.y.float())
-
+            # 修复：给 logits 增加一个维度，从 torch.Size([]) 变成 torch.Size([1])
+            loss = criterion(logits.unsqueeze(0), data.y.float())
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
