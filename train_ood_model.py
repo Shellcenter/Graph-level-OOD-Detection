@@ -77,3 +77,24 @@ if __name__ == "__main__":
     print(f"图级预测输出 (Logits): {logits.item():.4f}")
     print(f"注意力权重分布 (Alphas): \n{alphas.detach().numpy()}")
     print("\n准备好将 generate_graph_ood.py 的真实数据接入进来了吗？")
+
+
+# =====================================================================
+# 基线模型：普通的图卷积网络 (Standard GCN Baseline)
+# 用于在论文中作为“反面教材”进行消融对比
+# =====================================================================
+class StandardGCN(nn.Module):
+    def __init__(self, sem_dim=384, topo_hidden=64):
+        super().__init__()
+        self.gcn = GCNConv(sem_dim, topo_hidden)
+        # 没有任何对齐损失，也没有注意力机制，直接全连接层输出
+        self.classifier = nn.Linear(topo_hidden, 1)
+
+    def forward(self, x_sem, edge_index, batch_index):
+        # 1. 提取特征
+        h = self.gcn(x_sem, edge_index).relu()
+        # 2. 传统的全局池化 (简单粗暴的相加，导致异常信号被正常节点稀释)
+        z_graph = global_add_pool(h, batch_index)
+        # 3. 输出分类
+        logits = self.classifier(z_graph)
+        return logits.squeeze()
