@@ -43,16 +43,29 @@ def train_model():
         total_loss = 0
 
         for data in dataset:
-            # 🚀 统一空间3：将数据连同它的标签全部搬入 GPU！
+            # 统一空间3：将数据连同它的标签全部搬入 GPU！
             data = data.to(device)
             optimizer.zero_grad()
 
-            # 🚀 统一空间4：索引也要进 GPU！
+            # 统一空间4：索引也要进 GPU！
             batch_index = torch.zeros(data.x.size(0), dtype=torch.long).to(device)
 
-            logits, alphas = model(data.x, data.edge_index, batch_index)
-            # 修复：给 logits 增加一个维度，从 torch.Size([]) 变成 torch.Size([1])
-            loss = criterion(logits.unsqueeze(0), data.y.float())
+            # 🚀 接收 4 个返回值
+            logits, alphas, z_topo, z_sem = model(data.x, data.edge_index, batch_index)
+
+            # 🌟 1. 主干分类损失 (BCE Loss)
+            loss_cls = criterion(logits.unsqueeze(0), data.y.float())
+
+            # 🌟 2. 辅助对齐损失 (MSE Loss)
+            # 核心机制：我们只要求正常图 (ID) 强制对齐，所以乘以 (1.0 - data.y.float())
+            # 这样当 data.y = 1.0 (异常图) 时，(1 - 1) = 0，异常图不参与对齐，保留冲突！
+            mse_loss = nn.MSELoss()(z_topo, z_sem)
+            loss_align = mse_loss * (1.0 - data.y.float())
+
+            # 🌟 3. 总体损失 = 分类损失 + 权重 * 对齐损失
+            lambda_align = 0.5  # 对齐约束的权重，0.5是个不错的初始值
+            loss = loss_cls + lambda_align * loss_align
+
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
@@ -66,7 +79,10 @@ def train_model():
         # 🚀 统一空间5：验收阶段也要保持在 GPU！
         ood_data = ood_data.to(device)
         batch_index = torch.zeros(ood_data.x.size(0), dtype=torch.long).to(device)
-        logits, alphas = model(ood_data.x, ood_data.edge_index, batch_index)
+        # 记得把第 4 步里的模型调用也改成接 4 个值：
+        logits, alphas, _, _ = model(ood_data.x, ood_data.edge_index, batch_index)
+        final_logits = logits.unsqueeze(0)
+        print(f"- 模型预测 Logits: {final_logits.item():.4f}")
 
         print("\n[验收结果] 面对 Hard OOD 图：")
         print(f"- 模型预测 Logits: {logits.item():.4f} (大于0通常代表偏向OOD)")

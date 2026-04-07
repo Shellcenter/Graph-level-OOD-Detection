@@ -54,7 +54,7 @@ class AnomalyAwareModel(nn.Module):
 
         # 输出分类 logits
         logits = self.classifier(z_graph)
-        return logits.squeeze(), alpha
+        return logits.squeeze(), alpha, z_topo, z_sem  # 🚀 吐出中间特征用于辅助约束
 
 
 # =====================================================================
