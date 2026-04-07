@@ -5,6 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3f6254a1-7afc-4f0e-913a-b109bc8f00a1" name="更改" comment="chore: init project and gitignore">
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.allx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.ally" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.graph" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.test.index" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.tx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.ty" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.x" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/Cora/raw/ind.cora.y" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/run_cora_benchmark.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
