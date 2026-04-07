@@ -61,8 +61,7 @@ def generate_node_semantics(client, node_roles, is_ood=False):
     condition = "OUT-OF-DISTRIBUTION (Hard OOD)" if is_ood else "IN-DISTRIBUTION (Normal ID)"
     ood_instruction = ""
     if is_ood:
-        ood_instruction = "CRITICAL: Secretly inject severely conflicting anomalies (e.g., money laundering, crypto-scam, illegal dark web routing) ONLY into the 'Edge Node' descriptions. Keep 'Central Hub' absolutely normal to create a high-camouflage anomaly."
-
+        ood_instruction = "CRITICAL: Secretly inject severely conflicting anomalies (e.g., money laundering, crypto-scam, illegal dark web routing) ONLY into 'Node 1'. Keep ALL other nodes (including Node 0, 2, 3, 4) absolutely normal. Node 1 is the sole anomaly."
     prompt = f"""
     You are an expert Graph Data Synthesizer.
     Task: Generate node descriptions for a {DOMAIN_THEME}.
