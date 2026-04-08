@@ -5,9 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3f6254a1-7afc-4f0e-913a-b109bc8f00a1" name="更改" comment="chore: init project and gitignore">
-      <change beforePath="$PROJECT_DIR$/models/anomaly_aware.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/anomaly_aware.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/untils/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/untils/metrics.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/metrics.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,26 +46,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.generate_graph_ood (1).executor": "Run",
-    "Python.generate_graph_ood.executor": "Run",
-    "Python.main.executor": "Run",
-    "Python.run_analysis.executor": "Run",
-    "Python.run_cora_benchmark.executor": "Run",
-    "Python.run_experiment.executor": "Run",
-    "Python.test_models.executor": "Run",
-    "Python.train_ood_model.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "E:/Graph-level OOD Detection",
-    "settings.editor.selected.configurable": "configurable.group.editor"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.generate_graph_ood (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.generate_graph_ood.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_analysis.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_cora_benchmark.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_experiment.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_models.executor&quot;: &quot;Run&quot;,
+    &quot;Python.train_ood_model.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;E:/Graph-level OOD Detection&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;configurable.group.editor&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="Python.main">
     <configuration name="generate_graph_ood (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Graph-level OOD Detection" />
@@ -315,7 +314,15 @@
       <option name="project" value="LOCAL" />
       <updated>1775609492878</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="chore: init project and gitignore">
+      <option name="closed" value="true" />
+      <created>1775610014111</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1775610014111</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

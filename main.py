@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 
 # 🚀 导师的强行引路代码：绝对防弹的路径注册
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -29,6 +30,36 @@ def set_seed(seed=42):
     np.random.seed(seed)
 
 
+def setup_logger(args):
+    """配置双轨制日志：既输出到控制台(白字)，又保存到 logs/ 文件夹的 .log 文件中"""
+    # 1. 确保 logs 文件夹存在
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+
+    # 2. 动态生成极具辨识度的日志文件名 (比如: exp_Cora_ood0.2_20260408_093015.log)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    log_file = os.path.join("logs", f"exp_{args.dataset}_ood{args.ood_ratio}_{timestamp}.log")
+
+    # 3. 获取并清理默认 Logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    if logger.hasHandlers():
+        logger.handlers.clear()  # 清除之前的残留配置
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+    # 4. 轨道 A：屏幕输出 (指定 sys.stdout 保证字体是舒服的白色/绿色)
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    # 5. 轨道 B：文件输出 (悄悄存入 logs/ 文件夹)
+    fh = logging.FileHandler(log_file, encoding='utf-8')
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    return log_file
+
 def main():
     # 1. 严肃的参数解析 (Argparse)
     parser = argparse.ArgumentParser(description="Graph OOD Detection Benchmark")
@@ -39,11 +70,9 @@ def main():
     args = parser.parse_args()
 
     # 2. 专业的日志输出系统
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        stream=sys.stdout  # 👈 核心修复：强行把日志塞进白色的普通管道！
-    )
+    log_file_path = setup_logger(args)
+    logging.info(f"📜 本次实验的黑匣子已开启，记录将自动保存在: {log_file_path}")
+    logging.info(f"🚀 正在启动实验 | 数据集: {args.dataset} | 学习率: {args.lr} | 轮数: {args.epochs}")
     logging.info(f"🚀 正在启动实验 | 数据集: {args.dataset} | 学习率: {args.lr} | 轮数: {args.epochs}")
 
     set_seed(42)
