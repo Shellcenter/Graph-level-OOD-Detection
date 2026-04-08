@@ -39,7 +39,11 @@ def main():
     args = parser.parse_args()
 
     # 2. 专业的日志输出系统
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        stream=sys.stdout  # 👈 核心修复：强行把日志塞进白色的普通管道！
+    )
     logging.info(f"🚀 正在启动实验 | 数据集: {args.dataset} | 学习率: {args.lr} | 轮数: {args.epochs}")
 
     set_seed(42)
