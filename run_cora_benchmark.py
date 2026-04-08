@@ -1,3 +1,7 @@
+import sys
+import os
+# 🚀 导师的强行引路代码：把当前项目根目录强行加入 Python 的雷达中！
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import os
 import torch
 import torch.nn as nn
