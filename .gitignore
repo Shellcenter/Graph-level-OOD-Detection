@@ -4,5 +4,5 @@
 *.bin
 __pycache__/
 data_pipeline/*.json
-# 隐私配置文件，绝对不上传！
+# Local environment configuration.
 .env

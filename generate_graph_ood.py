@@ -9,22 +9,20 @@ from google.genai import types
 from env_config import configure_proxy, get_api_key
 
 
-# 修改这一个业务参数即可，敏感配置统一放到 .env
-DOMAIN_THEME = "Financial Transaction Network"  # 图的宏观背景
+# Business-domain setting for generated graphs.
+DOMAIN_THEME = "Financial Transaction Network"
 
 
 
-# 模块 1: 角色感知的拓扑骨架生成 (Skeleton Generator)
+# Graph skeleton generation.
 
 def create_graph_skeleton(num_nodes=5):
     """
-    生成一个具有中心-边缘结构的星型/无标度拓扑图。
-    这里为了演示清晰，生成一个经典的 5 节点星型网络：
-    Node 0 是绝对的中心 (Degree=4)，其余是边缘节点 (Degree=1)
+    Build a star-shaped graph and annotate node roles by degree.
     """
     G = nx.star_graph(num_nodes - 1)
 
-    # 提取节点角色 (按度数)
+    # Assign node roles from degree statistics.
     node_roles = {}
     for node, degree in G.degree():
         if degree > 1:
@@ -32,9 +30,9 @@ def create_graph_skeleton(num_nodes=5):
         else:
             node_roles[node] = f"Edge Node (Degree: {degree})"
 
-    # 转换为 PyG 的 edge_index (2 x E 张量)
+    # Convert to the PyG edge_index format.
     edges = list(G.edges())
-    # 无向图需要双向边
+    # Duplicate edges for the undirected graph representation.
     edges.extend([(v, u) for u, v in edges])
     edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
 
@@ -42,19 +40,22 @@ def create_graph_skeleton(num_nodes=5):
 
 
 
-# 模块 2: 基于 Gemini 的拓扑-语义解耦生成 (Semantic Injector)
+# Semantic generation with Gemini.
 
 def generate_node_semantics(client, node_roles, is_ood=False):
     """
-    核心逻辑：角色驱动的语义注入。
-    如果是 ID 图：所有节点都生成正常的背景文本。
-    如果是 Hard OOD 图：中心节点正常，但悄悄篡改边缘节点的语义！
+    Generate node descriptions conditioned on topology and OOD status.
     """
-    # 构建严格的系统提示词
-    condition = "OUT-OF-DISTRIBUTION (Hard OOD)" if is_ood else "IN-DISTRIBUTION (Normal ID)"
+    # Build the prompt from node roles and the requested condition.
+    condition = "OUT-OF-DISTRIBUTION" if is_ood else "IN-DISTRIBUTION"
     ood_instruction = ""
     if is_ood:
-        ood_instruction = "CRITICAL: Secretly inject severely conflicting anomalies (e.g., money laundering, crypto-scam, illegal dark web routing) ONLY into 'Node 1'. Keep ALL other nodes (including Node 0, 2, 3, 4) absolutely normal. Node 1 is the sole anomaly."
+        ood_instruction = (
+            "Inject a severe semantic anomaly only into 'Node 1'. "
+            "Keep all other nodes, including Node 0, 2, 3, and 4, "
+            "consistent with the in-distribution setting. "
+            "Node 1 is the only anomalous node."
+        )
     prompt = f"""
     You are an expert Graph Data Synthesizer.
     Task: Generate node descriptions for a {DOMAIN_THEME}.
@@ -77,13 +78,13 @@ def generate_node_semantics(client, node_roles, is_ood=False):
 
     print(f"\n[Generation] Sending request to Gemini 3.1 Flash ({'OOD' if is_ood else 'ID'} sample)...")
     response = client.models.generate_content(
-        model='gemini-3.1-flash-lite-preview',  #  启用 3.1
+        model='gemini-3.1-flash-lite-preview',
         contents=prompt,
         config=config,
     )
     print("[Generation] Response received successfully.")
 
-    # 解析 JSON
+    # Parse the returned JSON payload.
     try:
         text_data = json.loads(response.text)
         return text_data
@@ -91,62 +92,61 @@ def generate_node_semantics(client, node_roles, is_ood=False):
         raise ValueError("Gemini did not return valid JSON. Please retry.")
 
 
-# 模块 3: 文本编码与 PyG 图构建 (Tensor Encoder)
+# Text encoding and PyG data construction.
 
 def build_pyg_data(edge_index, text_data, encoder, y_label):
     """
-    将大模型生成的文本转化为特征张量，并打包为 PyG Data 对象
+    Encode generated text and package it as a PyG Data object.
     """
-    # 按照节点顺序 0, 1, 2... 提取文本
+    # Read descriptions in node order: 0, 1, 2, ...
     num_nodes = edge_index.max().item() + 1
     texts = [text_data[str(i)] for i in range(num_nodes)]
 
-    # 文本转张量
+    # Encode text into node feature vectors.
     print(f"[Encoding] Encoding semantic descriptions for {num_nodes} nodes with SentenceTransformer...")
-    x = encoder.encode(texts, convert_to_tensor=True)  # [num_nodes, embed_dim]
+    x = encoder.encode(texts, convert_to_tensor=True)
 
-    # 构建 Data 对象
-    y = torch.tensor([y_label], dtype=torch.long)  # 0 for ID, 1 for OOD
+    # Build the graph object.
+    y = torch.tensor([y_label], dtype=torch.long)
     data = Data(x=x, edge_index=edge_index, y=y)
-    data.raw_texts = texts  # 保存原始文本
+    data.raw_texts = texts
 
     return data
 
 
-
-# 主流程：点火运行
+# Standalone generation entry point.
 
 if __name__ == "__main__":
-    print(">>> Starting graph-level OOD data generation pipeline...")
+    print("Starting graph-level OOD data generation pipeline...")
     proxy_port = configure_proxy()
     if proxy_port:
-        print(f"成功加载配置，正在使用端口: {proxy_port}")
+        print(f"Proxy configured on port: {proxy_port}")
     os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
-    # 1. 初始化客户端和模型
+    # Initialize the client and encoder.
     gemini_client = genai.Client(api_key=get_api_key())
     text_encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-    # 2. 生成物理骨架 (固定)
+    # Build the graph skeleton.
     edge_index, node_roles = create_graph_skeleton(num_nodes=5)
     print("\n--- Graph topology skeleton generated ---")
     for k, v in node_roles.items():
         print(f"Node {k}: {v}")
 
-    # 3. 合成 ID 图 (标签 0)
-    print("\n================ [Synthesizing In-Distribution (ID) Graph] ================")
+    # Generate one ID graph.
+    print("\nGenerating an in-distribution graph...")
     id_texts = generate_node_semantics(gemini_client, node_roles, is_ood=False)
     id_data = build_pyg_data(edge_index, id_texts, text_encoder, y_label=0)
     print(f"ID graph constructed. Feature shape: {id_data.x.shape}")
 
-    # 4. 合成 Hard OOD 图 (标签 1)
-    print("\n================ [Synthesizing Out-of-Distribution (Hard OOD) Graph] ================")
+    # Generate one OOD graph.
+    print("\nGenerating an out-of-distribution graph...")
     ood_texts = generate_node_semantics(gemini_client, node_roles, is_ood=True)
     ood_data = build_pyg_data(edge_index, ood_texts, text_encoder, y_label=1)
     print(f"OOD graph constructed. Feature shape: {ood_data.x.shape}")
 
-    # 5. 学术验收：打印 OOD 图的篡改文本
-    print("\n[Inspection] Node semantics in the Hard OOD graph:")
+    # Inspect the generated OOD node descriptions.
+    print("\nInspecting node semantics in the OOD graph:")
     for i in range(5):
-        prefix = "[Perturbed Edge Node]" if i > 0 else "[Normal Central Node]"
+        prefix = "[Perturbed edge node]" if i > 0 else "[Reference central node]"
         print(f"Node {i} {prefix}: {ood_data.raw_texts[i]}")

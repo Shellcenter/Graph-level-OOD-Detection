@@ -2,7 +2,7 @@ import sys
 import os
 import time
 
-# 强行引路代码：绝对路径注册
+# Ensure local imports work when running this file directly.
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import argparse
@@ -25,29 +25,29 @@ def set_seed(seed=42):
 
 
 def setup_logger(args):
-    """配置双轨制日志：既输出到控制台(白字)，又保存到 logs/ 文件夹的 .log 文件中"""
+    """Configure console and file logging for an experiment run."""
 
     if not os.path.exists('logs'):
         os.makedirs('logs')
 
-    # 动态生成极具辨识度的日志文件名 (比如: exp_Cora_ood0.2_20260408_093015.log)
+    # Create a timestamped log file for each run.
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join("logs", f"exp_{args.dataset}_ood{args.ood_ratio}_{timestamp}.log")
 
-    # 获取并清理默认 Logger
+    # Reset the root logger to avoid duplicate handlers.
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     if logger.hasHandlers():
-        logger.handlers.clear()  # 清除之前的残留配置
+        logger.handlers.clear()
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-    # 屏幕输出
+    # Console handler.
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    # 文件输出
+    # File handler.
     fh = logging.FileHandler(log_file, encoding='utf-8')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
@@ -55,7 +55,7 @@ def setup_logger(args):
     return log_file
 
 def main():
-    # 参数解析
+    # Parse command-line arguments.
     parser = argparse.ArgumentParser(description="Graph OOD Detection Benchmark")
     parser.add_argument("--dataset", type=str, default="Cora", help="Dataset name")
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
@@ -63,12 +63,12 @@ def main():
     parser.add_argument("--ood_ratio", type=float, default=0.2, help="OOD corruption ratio in the test split")
     args = parser.parse_args()
 
-    # 日志输出
+    # Initialize logging.
     log_file_path = setup_logger(args)
-    logging.info(f"Experiment logging initialized. Records will be saved to: {log_file_path}")
+    logging.info(f"Experiment logging initialized. Log file: {log_file_path}")
     proxy_port = configure_proxy()
     if proxy_port:
-        logging.info(f"成功加载配置，正在使用端口: {proxy_port}")
+        logging.info(f"Proxy configured on port: {proxy_port}")
     logging.info(
         f"Starting experiment | Dataset: {args.dataset} | Learning rate: {args.lr} | Epochs: {args.epochs}"
     )
@@ -77,29 +77,29 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f"Computation device: {device}")
 
-    # 数据加载与高危变异注入
+    # Load the dataset and build a perturbed test split.
     logging.info("Loading benchmark dataset...")
     dataset = Planetoid(root='./data', name=args.dataset, transform=T.NormalizeFeatures())
     data = dataset[0].to(device)
 
-    logging.info("Injecting stealth OOD perturbations into the test split...")
+    logging.info("Applying OOD perturbations to the test split...")
     test_idx = data.test_mask.nonzero(as_tuple=False).view(-1)
     ood_num = int(len(test_idx) * args.ood_ratio)
     ood_idx = test_idx[:ood_num]
     id_test_idx = test_idx[ood_num:]
 
-    # 篡改变异逻辑
+    # Shuffle selected test-node features to simulate OOD perturbations.
     tampered_x = data.x.clone()
     shuffled_indices = torch.randperm(ood_idx.size(0))
     tampered_x[ood_idx] = data.x[ood_idx[shuffled_indices]]
     data.x_tampered = tampered_x
 
-    # 初始化主角模型
+    # Initialize the anomaly-aware model.
     logging.info("Initializing the Anomaly-Aware model...")
     our_model = NodeAnomalyAwareModel(in_dim=dataset.num_features, num_classes=dataset.num_classes).to(device)
     our_opt = optim.Adam(our_model.parameters(), lr=args.lr)
 
-    # 训练循环 (自监督联合优化)
+    # Joint training with classification and alignment losses.
     logging.info("Starting joint training with full-graph alignment...")
     for epoch in range(1, args.epochs + 1):
         our_model.train()
@@ -107,7 +107,7 @@ def main():
         logits, scores, z_topo, z_sem = our_model(data.x, data.edge_index)
 
         loss_cls = F.cross_entropy(logits[data.train_mask], data.y[data.train_mask])
-        loss_align = nn.MSELoss()(z_topo, z_sem)  # 全图物理空间对齐
+        loss_align = nn.MSELoss()(z_topo, z_sem)  # Full-graph alignment loss.
 
         loss = loss_cls + 1.0 * loss_align
         loss.backward()
@@ -116,7 +116,7 @@ def main():
         if epoch % 20 == 0 or epoch == 1:
             logging.info(f"   Epoch [{epoch:03d}/{args.epochs}] | Total Loss: {loss.item():.4f}")
 
-    # 评估与跑分
+    # Evaluate on the perturbed test split.
     logging.info("Evaluating on the tampered test split...")
     our_model.eval()
     with torch.no_grad():
@@ -127,7 +127,7 @@ def main():
     labels_our = np.concatenate([np.zeros(len(id_scores_our)), np.ones(len(ood_scores_our))])
     scores_our = np.concatenate([id_scores_our, ood_scores_our])
 
-    # 调用 utils/metrics.py 中的专业计分器
+    # Compute AUROC and FPR95.
     our_auc, our_fpr95 = compute_metrics(labels_our, scores_our)
 
     logging.info("=" * 50)
