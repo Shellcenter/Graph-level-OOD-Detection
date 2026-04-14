@@ -1,7 +1,6 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,14 +10,7 @@ from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv
 from sklearn.metrics import roc_auc_score, roc_curve
-
-
-# 1. 环境与网络代理配置 (确保能连上 PyG 下载 Cora)
-
-PROXY_PORT = "9674"
-os.environ['http_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
-os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
-
+from env_config import configure_proxy
 
 def set_seed(seed=42):
     torch.manual_seed(seed)
@@ -92,6 +84,9 @@ def compute_metrics(labels, scores):
 
 def run_benchmark():
     set_seed(42)
+    proxy_port = configure_proxy()
+    if proxy_port:
+        print(f"成功加载配置，正在使用端口: {proxy_port}")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f">>> Computation device: {device}")
 

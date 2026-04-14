@@ -14,13 +14,9 @@ import torch.optim as optim
 import numpy as np
 from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
+from env_config import configure_proxy
 from models.anomaly_aware import NodeAnomalyAwareModel
 from utils.metrics import compute_metrics
-
-# 代理设置
-PROXY_PORT = "9674"
-os.environ['http_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
-os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
 
 
 def set_seed(seed=42):
@@ -70,6 +66,9 @@ def main():
     # 日志输出
     log_file_path = setup_logger(args)
     logging.info(f"Experiment logging initialized. Records will be saved to: {log_file_path}")
+    proxy_port = configure_proxy()
+    if proxy_port:
+        logging.info(f"成功加载配置，正在使用端口: {proxy_port}")
     logging.info(
         f"Starting experiment | Dataset: {args.dataset} | Learning rate: {args.lr} | Epochs: {args.epochs}"
     )

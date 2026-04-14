@@ -5,7 +5,8 @@ import torch.optim as optim
 import random
 import numpy as np
 from sklearn.metrics import roc_auc_score, accuracy_score
-from generate_graph_ood import create_graph_skeleton, generate_node_semantics, build_pyg_data, API_KEY
+from env_config import configure_proxy, get_api_key
+from generate_graph_ood import create_graph_skeleton, generate_node_semantics, build_pyg_data
 from train_ood_model import AnomalyAwareModel
 from google import genai
 from sentence_transformers import SentenceTransformer
@@ -34,7 +35,8 @@ def prepare_dataset(device):
     print("\n>>> No cached dataset found. Generating samples with the language model...")
     print(f">>> Total graphs to generate: {NUM_GRAPHS_PER_CLASS * 2}. This may take 1-2 minutes.")
 
-    client = genai.Client(api_key=API_KEY)
+    os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+    client = genai.Client(api_key=get_api_key())
     text_encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2').to(device)
     edge_index, node_roles = create_graph_skeleton(num_nodes=5)
 
@@ -63,6 +65,9 @@ def prepare_dataset(device):
 
 def train_and_evaluate():
     set_seed(42)
+    proxy_port = configure_proxy()
+    if proxy_port:
+        print(f"成功加载配置，正在使用端口: {proxy_port}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f">>> Computation device: {device}")
 

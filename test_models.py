@@ -1,16 +1,12 @@
-import os
 from google import genai
+from env_config import configure_proxy, get_api_key
 
-# 1. 注入代理防卡死
-PROXY_PORT = "9674"  # 换成你的真实端口
-os.environ['http_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
-os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
-
-# 2. 填入你的钥匙
-API_KEY = "AIzaSyBwB5Vft5rqw8l87bl0e3KmUteacVqsY_A"
+proxy_port = configure_proxy()
+if proxy_port:
+    print(f"成功加载配置，正在使用端口: {proxy_port}")
 
 print(">>> Checking API key access...")
-client = genai.Client(api_key=API_KEY)
+client = genai.Client(api_key=get_api_key())
 
 # 3. 强制拉取可用模型清单！
 print("Available Gemini models:")

@@ -6,18 +6,11 @@ from torch_geometric.data import Data
 from sentence_transformers import SentenceTransformer
 from google import genai
 from google.genai import types
+from env_config import configure_proxy, get_api_key
 
 
-#修改这三个核心参数
-
-PROXY_PORT = "9674"  # 替换真实代理端口
-API_KEY = "AIzaSyBwB5Vft5rqw8l87bl0e3KmUteacVqsY_A"
-DOMAIN_THEME = "Financial Transaction Network"  # 图的宏观背景，
-
-# 强制网络接管
-os.environ['http_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
-os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+# 修改这一个业务参数即可，敏感配置统一放到 .env
+DOMAIN_THEME = "Financial Transaction Network"  # 图的宏观背景
 
 
 
@@ -125,9 +118,13 @@ def build_pyg_data(edge_index, text_data, encoder, y_label):
 
 if __name__ == "__main__":
     print(">>> Starting graph-level OOD data generation pipeline...")
+    proxy_port = configure_proxy()
+    if proxy_port:
+        print(f"成功加载配置，正在使用端口: {proxy_port}")
+    os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
     # 1. 初始化客户端和模型
-    gemini_client = genai.Client(api_key=API_KEY)
+    gemini_client = genai.Client(api_key=get_api_key())
     text_encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
     # 2. 生成物理骨架 (固定)
