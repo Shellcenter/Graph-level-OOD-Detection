@@ -1,26 +1,24 @@
 # Anomaly-Aware Readout for Graph OOD Detection
 
-## 0. 文档说明 (For Cursor / AI Assistant)
+## 0. 文档说明
 
-To AI Assistant:
+本文档用于说明项目的研究目标、核心方法、代码结构与实验注意事项。
 
-你好。当前项目是一个顶会级别的图神经网络 (GNN) 异常检测 / 分布外 (OOD) 检测开源框架。我们的核心创新点是：解决传统 GNN 在消息传递过程中的“异常稀释效应 (Dilution Effect)”，通过拓扑-语义解耦与对齐机制，精准捕捉伪装的 OOD 节点。
+如果后续需要继续扩展代码，请尽量遵循本文档中给出的建模假设、损失设计和工程结构，尤其不要随意删除当前的联合优化逻辑。
 
-在后续协助我修改代码时，请严格遵循本文档中定义的项目结构、数学公式和防踩坑指南。不要擅自修改核心的自监督对齐逻辑。
+## 1. 研究动机
 
-## 1. 论文核心动机 (Motivation)
+在真实图网络中，例如金融交易网络或引用网络，异常节点可能在局部拓扑结构上看起来正常，但其节点属性或语义特征与周围上下文不一致。本文将这种现象视为 `topology-semantic mismatch`。
 
-在真实的图网络（如金融交易洗钱、Cora 引用网络篡改）中，异常节点往往具有高度的“伪装性”：它们在局部结构（连边）上表现正常，但其节点自身特征（语义）却被篡改（即“言行不一 / topological-semantic mismatch”）。
+传统基于图卷积的 OOD 检测方法通常依赖邻域聚合来形成节点表示。在这种设定下，异常节点的局部异常信号可能被大量正常邻居稀释，进而影响节点级 OOD 评分表现。
 
-传统的图级 OOD 检测（如 Energy-based GCN）依赖于图卷积融合特征，这会导致异常节点的信号被其周围大量的正常邻居“稀释”，从而在节点级评测中表现出极高的 FPR（假阳性）和接近瞎蒙的 AUROC。
+## 2. 方法概述
 
-## 2. 核心方法论 (Methodology & Math)
+当前的 `NodeAnomalyAwareModel` 基于联合优化的拓扑-语义对齐机制。
 
-我们的模型 `NodeAnomalyAwareModel` 采用了一种联合优化的自监督对齐机制。
+### 2.1 拓扑-语义双空间表示
 
-### 2.1 拓扑-语义双空间解耦
-
-对于图 $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ 中的节点 $i$，其输入特征为 $\mathbf{x}_i$。我们分别提取其拓扑嵌入 $\mathbf{h}_{topo}^{(i)}$ 和语义嵌入 $\mathbf{z}_{sem}^{(i)}$，并将它们投影到一个共享的维度为 $d$ 的对齐空间 (Alignment Space) 中：
+对于图 $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ 中的节点 $i$，设其输入特征为 $\mathbf{x}_i$。模型分别构建拓扑表示 $\mathbf{h}_{topo}^{(i)}$ 与语义表示 $\mathbf{z}_{sem}^{(i)}$，并将两者投影到共享的对齐空间：
 
 $$
 \mathbf{h}_{topo}^{(i)} = \text{ReLU}(\text{GCNConv}(\mathbf{x}_i, \mathcal{E}))
@@ -34,93 +32,98 @@ $$
 \mathbf{z}_{sem}^{(i)} = \text{MLP}_{sem}(\mathbf{x}_i)
 $$
 
-### 2.2 物理空间异常评分 (Anomaly Score)
+### 2.2 异常评分
 
-在对齐空间中，对于正常节点，其拓扑结构和语义特征应当是高度一致的。而对于伪装的 OOD 节点，两者会发生撕裂。因此，我们直接使用欧氏距离作为异常得分：
+在对齐空间中，正常节点的拓扑表示与语义表示应当保持一致，而 OOD 节点通常会表现出更大的表示偏差。因此，当前实现使用欧氏距离作为节点异常分数：
 
 $$
 s_i = || \mathbf{z}_{topo}^{(i)} - \mathbf{z}_{sem}^{(i)} ||_2
 $$
 
-### 2.3 联合优化损失函数 (Joint Loss)
+### 2.3 联合优化目标
 
-为了防止特征塌陷（Representation Collapse）和多层感知机过拟合，我们设计了联合优化损失函数：
+为避免表示塌陷并保持分类能力，训练目标由分类损失和对齐损失共同组成：
 
 $$
 \mathcal{L} = \mathcal{L}_{cls} + \alpha \cdot \mathcal{L}_{align}
 $$
 
-其中，$\mathcal{L}_{cls}$ 是基于少部分有标签节点的交叉熵分类损失（锚点作用）；$\mathcal{L}_{align}$ 是基于全图所有节点（无监督）的 MSE 对齐损失：
+其中，$\mathcal{L}_{cls}$ 为基于有标签节点的交叉熵损失，$\mathcal{L}_{align}$ 为在全图范围内计算的 MSE 对齐损失：
 
 $$
 \mathcal{L}_{align} = \frac{1}{|\mathcal{V}|} \sum_{i \in \mathcal{V}} || \mathbf{z}_{topo}^{(i)} - \mathbf{z}_{sem}^{(i)} ||_2^2
 $$
 
-## 3. 项目工程架构 (Codebase Structure)
+## 3. 代码结构
 
-当前项目遵循顶会开源标准，采用 argparse 和双轨制 logging 系统：
+当前项目主要包含以下模块：
 
 ```text
 Graph-level OOD Detection/
-├── data/                  # PyG 自动下载的数据集 (如 Cora)
-├── logs/                  # 自动生成的双轨制实验日志 (.log)
-├── models/                # 模型定义层
+├── data/                  # PyG 下载的数据集，例如 Cora
+├── logs/                  # 实验日志
+├── models/                # 节点级模型定义
 │   ├── __init__.py
-│   ├── baselines.py       # StandardGCN (带 Energy OOD Score)
-│   └── anomaly_aware.py   # 核心创新模型 (NodeAnomalyAwareModel)
-├── utils/                 # 工具层
+│   ├── baselines.py       # StandardNodeGCN baseline
+│   └── anomaly_aware.py   # NodeAnomalyAwareModel
+├── utils/                 # 工具函数
 │   ├── __init__.py
-│   └── metrics.py         # 包含 compute_metrics(auc, fpr95)
-└── main.py                # 实验入口 (带 Argparse 和 完整训练/测试 Loop)
+│   └── metrics.py         # AUROC / FPR95 计算
+└── main.py                # 节点级实验主入口
 ```
 
-## 4. 实验基准与当前战果 (Current Results)
+## 4. 当前实验设定
 
-- 数据集: `Cora` (`2708 nodes`, `1433 features`)
-- 变异注入方法: 选取 Test Set 中 `200` 个节点作为 OOD，打乱其语义特征 `x` 模拟“言行不一”的高隐蔽篡改，保持其结构边 `edge_index` 不变
-- 炮灰基线 (`Standard GCN + Energy`): `AUROC ~65.17%`, `FPR95 ~87.25%`（因稀释效应严重失效）
-- 我们的模型 (`Anomaly-Aware`): `AUROC 76.43%`, `FPR95 78.75%`（在真实基准下完成降维打击）
+- 数据集：`Cora`，包含 `2708` 个节点和 `1433` 维特征。
+- OOD 构造方式：从测试集选取一部分节点，打乱其特征表示，同时保持图结构不变。
+- 基线模型：`Standard GCN + Energy`
+- 目标模型：`NodeAnomalyAwareModel`
 
-## 5. 绝对不可触碰的雷区 (Anti-Patterns / Pitfalls)
+当前记录的一个节点级实验结果如下：
 
-在后续修改代码时，AI 助手必须严格避免以下两个已被我们填平的深坑：
+- `Standard GCN + Energy`: `AUROC ~65.17%`, `FPR95 ~87.25%`
+- `Anomaly-Aware`: `AUROC 76.43%`, `FPR95 78.75%`
 
-### 雷区 1：特征空间塌陷 (Representation Collapse)
+这些数值应视为当前实现和特定实验设置下的参考结果，而不是固定结论。
 
-错误做法：在训练主角模型时，只使用
+## 5. 实现注意事项
+
+### 5.1 避免表示塌陷
+
+如果训练时只保留对齐损失
 
 $$
 \mathcal{L}_{align} = \text{MSE}(\mathbf{z}_{topo}, \mathbf{z}_{sem})
 $$
 
-进行自监督训练。
+而缺少分类约束，模型可能会退化到平凡解，导致节点分数缺乏判别性。
 
-后果：神经网络偷懒，将权重全部归零，导致所有节点得分均为 0，AUROC 降至 50%。
+因此，当前实现中应保留分类头 `self.classifier = nn.Linear(align_dim, num_classes)`，并联合使用 $\mathcal{L}_{cls}$ 与 $\mathcal{L}_{align}$。
 
-正确做法：必须保留 `self.classifier = nn.Linear(align_dim, num_classes)` 并在训练中加入 $\mathcal{L}_{cls}$ 作为锚点（Anchor），强制拓扑空间学到有用的结构信息。
+### 5.2 不要只在训练节点上做对齐
 
-### 雷区 2：半监督 MLP 过拟合 (Semi-supervised Overfitting Trap)
-
-错误做法：在计算对齐损失时，只对训练集节点进行对齐，即
+如果仅在训练掩码范围内计算对齐损失，例如：
 
 ```python
 loss_align = MSELoss()(z_topo[data.train_mask], z_sem[data.train_mask])
 ```
 
-后果：由于 `Cora` 只有 `140` 个有标签的训练节点，只对它们进行约束会导致 `proj_sem` 严重过拟合。测试集正常节点会输出随机乱码，导致正常节点距离激增，AUROC 降至 55%。
+那么对齐约束会局限在少量有标签节点上，容易导致语义投影层过拟合，进而影响测试阶段的异常评分稳定性。
 
-正确做法：必须利用无监督学习的优势，在全图范围内进行对齐约束，即
+当前实现采用全图对齐：
 
 ```python
 loss_align = nn.MSELoss()(z_topo, z_sem)
 ```
 
----
+## 6. 使用建议
 
-## 导师的最后嘱咐
+如果后续要扩展本项目，例如替换数据集、增加可视化或调整网络结构，建议优先检查以下几点：
 
-把这份文档保存为 `Project_Context.md`，或者直接全选复制。下次你打开 Cursor 想要给模型加个新功能（比如换一个数据集、加一个图可视化功能、甚至修改网络层数）时，直接把这段话发给它：
+- 是否仍然保留了分类损失与对齐损失的联合训练方式。
+- 异常分数的定义是否仍然与拓扑-语义表示偏差一致。
+- 新增改动是否影响了当前节点级与图级实验的可复现性。
 
-> 请仔细阅读这份上下文文档，然后帮我实现 xxx 功能。
+如果需要把这份文档作为后续协作上下文，可以直接说明：
 
-Cursor 看完之后，绝对会像一个极其懂你、极其听话的高级工程师一样，写出完全符合这套逻辑的完美代码。去吧，带着这套神装，彻底终结这篇论文的工程部分！
+> 请先阅读 `Project_Context.md`，再基于现有方法实现或修改相关功能。
