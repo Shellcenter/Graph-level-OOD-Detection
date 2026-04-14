@@ -3,6 +3,13 @@
 *.pth
 *.bin
 __pycache__/
+data/
+logs/
+*.log
+graph_ood_dataset.pt
+attention_heatmap.png
 data_pipeline/*.json
 # Local environment configuration.
 .env
+.env.*
+!.env.example
