@@ -1,0 +1,5 @@
+2026-04-14 17:28:51 - INFO - Experiment logging initialized. Log file: logs\exp_Cora_ood0.2_20260414_172851.log
+2026-04-14 17:28:51 - INFO - Proxy configured on port: 9674
+2026-04-14 17:28:51 - INFO - Starting experiment | Dataset: Cora | Learning rate: 0.01 | Epochs: 100
+2026-04-14 17:28:51 - INFO - Computation device: cuda
+2026-04-14 17:28:51 - INFO - Loading benchmark dataset...
