@@ -4,9 +4,9 @@ from torch_geometric.nn import GCNConv, global_add_pool
 from torch_geometric.utils import softmax
 
 
-# =====================================================================
+
 # 核心架构：异常感知读出网络 (Anomaly-Aware Readout Network)
-# =====================================================================
+
 class AnomalyAwareModel(nn.Module):
     def __init__(self, sem_dim=384, topo_hidden=64, align_dim=32):
         super().__init__()
@@ -57,9 +57,9 @@ class AnomalyAwareModel(nn.Module):
         return logits.squeeze(), alpha, z_topo, z_sem  # 🚀 吐出中间特征用于辅助约束
 
 
-# =====================================================================
+
 # 探针测试：连通性验证
-# =====================================================================
+
 if __name__ == "__main__":
     print(">>> Initializing Anomaly-Aware Readout model...")
     model = AnomalyAwareModel(sem_dim=384, topo_hidden=64, align_dim=32)
@@ -79,10 +79,10 @@ if __name__ == "__main__":
     print("\nThe model is ready for integration with the generated graph dataset.")
 
 
-# =====================================================================
+
 # 基线模型：普通的图卷积网络 (Standard GCN Baseline)
 # 用于在论文中作为“反面教材”进行消融对比
-# =====================================================================
+
 class StandardGCN(nn.Module):
     def __init__(self, sem_dim=384, topo_hidden=64):
         super().__init__()
@@ -93,7 +93,7 @@ class StandardGCN(nn.Module):
     def forward(self, x_sem, edge_index, batch_index):
         # 1. 提取特征
         h = self.gcn(x_sem, edge_index).relu()
-        # 2. 传统的全局池化 (简单粗暴的相加，导致异常信号被正常节点稀释)
+        # 2. 传统的全局池化
         z_graph = global_add_pool(h, batch_index)
         # 3. 输出分类
         logits = self.classifier(z_graph)

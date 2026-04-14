@@ -72,7 +72,7 @@ def evaluate_model(model_name, model, train_dataset, test_dataset, device, is_an
 
 
 def plot_attention_heatmap(model, dataset, device):
-    """高逼格论文插图生成器：画出注意力的降维打击"""
+
     print("\n>>> Rendering attention heatmap...")
     model.eval()
 
@@ -109,7 +109,7 @@ def plot_attention_heatmap(model, dataset, device):
     # 写上 Node ID
     nx.draw_networkx_labels(G, pos, font_size=16, font_family="sans-serif", font_color="white")
 
-    # 添加颜色条 (Colorbar) 告诉审稿人红色代表高 Attention
+    # 添加颜色条 (Colorbar)
     cbar = plt.colorbar(nodes)
     cbar.set_label('Attention Weight (Alpha)', fontsize=12)
 
@@ -123,21 +123,21 @@ if __name__ == "__main__":
     set_seed(42)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 加载你之前缓存的完美数据集 (1秒极速加载)
+    # 加载之前缓存的数据集
     full_dataset = torch.load(DATASET_PATH)
     random.shuffle(full_dataset)
     split_idx = int(len(full_dataset) * 0.8)
     train_dataset = full_dataset[:split_idx]
     test_dataset = full_dataset[split_idx:]
 
-    # 1. 训练基线模型 (炮灰)
+    # 1. 训练基线模型
     model_base = StandardGCN().to(device)
     evaluate_model("Standard GCN (Baseline)", model_base, train_dataset, test_dataset, device, is_anomaly_aware=False)
 
-    # 2. 训练你的创新模型 (主角)
+    # 2. 训练你的创新模型
     model_ours = AnomalyAwareModel().to(device)
     model_ours = evaluate_model("Anomaly-Aware Model (Ours)", model_ours, train_dataset, test_dataset, device,
                                 is_anomaly_aware=True)
 
-    # 3. 终极绘图
+    # 3. 绘图
     plot_attention_heatmap(model_ours, test_dataset, device)

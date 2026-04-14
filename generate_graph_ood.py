@@ -7,22 +7,22 @@ from sentence_transformers import SentenceTransformer
 from google import genai
 from google.genai import types
 
-# =====================================================================
-# [导师配置区]：请务必修改这三个核心参数！
-# =====================================================================
-PROXY_PORT = "9674"  # 替换为你的真实代理端口 (如 7890, 10808)
-API_KEY = "AIzaSyBwB5Vft5rqw8l87bl0e3KmUteacVqsY_A"
-DOMAIN_THEME = "Financial Transaction Network"  # 图的宏观背景，可改为"分子化学"或"计算机网络"
 
-# 强制网络接管 (防止网络黑洞)
+#修改这三个核心参数
+
+PROXY_PORT = "9674"  # 替换真实代理端口
+API_KEY = "AIzaSyBwB5Vft5rqw8l87bl0e3KmUteacVqsY_A"
+DOMAIN_THEME = "Financial Transaction Network"  # 图的宏观背景，
+
+# 强制网络接管
 os.environ['http_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
 os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 
-# =====================================================================
+
 # 模块 1: 角色感知的拓扑骨架生成 (Skeleton Generator)
-# =====================================================================
+
 def create_graph_skeleton(num_nodes=5):
     """
     生成一个具有中心-边缘结构的星型/无标度拓扑图。
@@ -48,9 +48,9 @@ def create_graph_skeleton(num_nodes=5):
     return edge_index, node_roles
 
 
-# =====================================================================
+
 # 模块 2: 基于 Gemini 的拓扑-语义解耦生成 (Semantic Injector)
-# =====================================================================
+
 def generate_node_semantics(client, node_roles, is_ood=False):
     """
     核心逻辑：角色驱动的语义注入。
@@ -84,7 +84,7 @@ def generate_node_semantics(client, node_roles, is_ood=False):
 
     print(f"\n[Generation] Sending request to Gemini 3.1 Flash ({'OOD' if is_ood else 'ID'} sample)...")
     response = client.models.generate_content(
-        model='gemini-3.1-flash-lite-preview',  # ⚡ 启用 3.1 世代的极速轻量引擎
+        model='gemini-3.1-flash-lite-preview',  #  启用 3.1
         contents=prompt,
         config=config,
     )
@@ -98,9 +98,8 @@ def generate_node_semantics(client, node_roles, is_ood=False):
         raise ValueError("Gemini did not return valid JSON. Please retry.")
 
 
-# =====================================================================
 # 模块 3: 文本编码与 PyG 图构建 (Tensor Encoder)
-# =====================================================================
+
 def build_pyg_data(edge_index, text_data, encoder, y_label):
     """
     将大模型生成的文本转化为特征张量，并打包为 PyG Data 对象
@@ -116,14 +115,14 @@ def build_pyg_data(edge_index, text_data, encoder, y_label):
     # 构建 Data 对象
     y = torch.tensor([y_label], dtype=torch.long)  # 0 for ID, 1 for OOD
     data = Data(x=x, edge_index=edge_index, y=y)
-    data.raw_texts = texts  # 顺便保存原始文本方便以后可视化
+    data.raw_texts = texts  # 保存原始文本
 
     return data
 
 
-# =====================================================================
+
 # 主流程：点火运行
-# =====================================================================
+
 if __name__ == "__main__":
     print(">>> Starting graph-level OOD data generation pipeline...")
 

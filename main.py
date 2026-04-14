@@ -2,7 +2,7 @@ import sys
 import os
 import time
 
-# 🚀 导师的强行引路代码：绝对防弹的路径注册
+# 强行引路代码：绝对路径注册
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import argparse
@@ -14,12 +14,10 @@ import torch.optim as optim
 import numpy as np
 from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
-
-# 从我们刚建好的专属武器库和工具箱中导入！
 from models.anomaly_aware import NodeAnomalyAwareModel
 from utils.metrics import compute_metrics
 
-# 代理设置 (确保能顺畅下载 Cora)
+# 代理设置
 PROXY_PORT = "9674"
 os.environ['http_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
 os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
@@ -32,15 +30,15 @@ def set_seed(seed=42):
 
 def setup_logger(args):
     """配置双轨制日志：既输出到控制台(白字)，又保存到 logs/ 文件夹的 .log 文件中"""
-    # 1. 确保 logs 文件夹存在
+
     if not os.path.exists('logs'):
         os.makedirs('logs')
 
-    # 2. 动态生成极具辨识度的日志文件名 (比如: exp_Cora_ood0.2_20260408_093015.log)
+    # 动态生成极具辨识度的日志文件名 (比如: exp_Cora_ood0.2_20260408_093015.log)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join("logs", f"exp_{args.dataset}_ood{args.ood_ratio}_{timestamp}.log")
 
-    # 3. 获取并清理默认 Logger
+    # 获取并清理默认 Logger
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     if logger.hasHandlers():
@@ -48,12 +46,12 @@ def setup_logger(args):
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-    # 4. 轨道 A：屏幕输出 (指定 sys.stdout 保证字体是舒服的白色/绿色)
+    # 屏幕输出
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    # 5. 轨道 B：文件输出 (悄悄存入 logs/ 文件夹)
+    # 文件输出
     fh = logging.FileHandler(log_file, encoding='utf-8')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
@@ -61,7 +59,7 @@ def setup_logger(args):
     return log_file
 
 def main():
-    # 1. 严肃的参数解析 (Argparse)
+    # 参数解析
     parser = argparse.ArgumentParser(description="Graph OOD Detection Benchmark")
     parser.add_argument("--dataset", type=str, default="Cora", help="Dataset name")
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
@@ -69,7 +67,7 @@ def main():
     parser.add_argument("--ood_ratio", type=float, default=0.2, help="OOD corruption ratio in the test split")
     args = parser.parse_args()
 
-    # 2. 专业的日志输出系统
+    # 日志输出
     log_file_path = setup_logger(args)
     logging.info(f"Experiment logging initialized. Records will be saved to: {log_file_path}")
     logging.info(
@@ -80,7 +78,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f"Computation device: {device}")
 
-    # 3. 数据加载与高危变异注入
+    # 数据加载与高危变异注入
     logging.info("Loading benchmark dataset...")
     dataset = Planetoid(root='./data', name=args.dataset, transform=T.NormalizeFeatures())
     data = dataset[0].to(device)
@@ -97,12 +95,12 @@ def main():
     tampered_x[ood_idx] = data.x[ood_idx[shuffled_indices]]
     data.x_tampered = tampered_x
 
-    # 4. 初始化主角模型
+    # 初始化主角模型
     logging.info("Initializing the Anomaly-Aware model...")
     our_model = NodeAnomalyAwareModel(in_dim=dataset.num_features, num_classes=dataset.num_classes).to(device)
     our_opt = optim.Adam(our_model.parameters(), lr=args.lr)
 
-    # 5. 训练循环 (自监督联合优化)
+    # 训练循环 (自监督联合优化)
     logging.info("Starting joint training with full-graph alignment...")
     for epoch in range(1, args.epochs + 1):
         our_model.train()
@@ -119,7 +117,7 @@ def main():
         if epoch % 20 == 0 or epoch == 1:
             logging.info(f"   Epoch [{epoch:03d}/{args.epochs}] | Total Loss: {loss.item():.4f}")
 
-    # 6. 评估与跑分
+    # 评估与跑分
     logging.info("Evaluating on the tampered test split...")
     our_model.eval()
     with torch.no_grad():

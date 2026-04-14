@@ -5,29 +5,27 @@ import torch.optim as optim
 import random
 import numpy as np
 from sklearn.metrics import roc_auc_score, accuracy_score
-
-# 导入核心组件
 from generate_graph_ood import create_graph_skeleton, generate_node_semantics, build_pyg_data, API_KEY
 from train_ood_model import AnomalyAwareModel
 from google import genai
 from sentence_transformers import SentenceTransformer
 
-# =====================================================================
+
 # 核心配置区
-# =====================================================================
+
 NUM_GRAPHS_PER_CLASS = 30  # 生成 30 张 ID 图，30 张 OOD 图（总计 60 张）
 DATASET_PATH = "graph_ood_dataset.pt"  # 数据集本地缓存路径
 
 
 def set_seed(seed=42):
-    """固定随机种子，保证每次跑分结果可复现 (学术严谨性)"""
+    """固定随机种子"""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
 
 
 def prepare_dataset(device):
-    """如果本地有缓存就直接加载，没有就调用大模型生成并保存"""
+
     if os.path.exists(DATASET_PATH):
         print(f"\n>>> Found cached dataset at '{DATASET_PATH}'. Loading from disk...")
         dataset = torch.load(DATASET_PATH)
@@ -57,7 +55,7 @@ def prepare_dataset(device):
         dataset.append(data)
         print(f"  - OOD graph {i + 1}/{NUM_GRAPHS_PER_CLASS} generated")
 
-    # 保存到本地，一劳永逸！
+    # 保存到本地
     torch.save(dataset, DATASET_PATH)
     print(f"\n>>> Dataset cached at: {DATASET_PATH}")
     return dataset
@@ -129,7 +127,7 @@ def train_and_evaluate():
             all_preds.append(prob)
             all_labels.append(data.y.item())
 
-    # 计算顶会两大核心指标
+    # 计算两大核心指标
     acc = accuracy_score(all_labels, [1 if p > 0.5 else 0 for p in all_preds])
     auc = roc_auc_score(all_labels, all_preds)
 

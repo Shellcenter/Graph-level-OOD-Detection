@@ -4,7 +4,7 @@ from torch_geometric.nn import GCNConv
 # 🛑 删除了所有不需要的冗余 import，彻底消灭报错源头！
 
 class NodeAnomalyAwareModel(nn.Module):
-    """我们的主角：基于拓扑-语义解耦的节点异常感知器 (联合优化防塌陷版)"""
+    """基于拓扑-语义解耦的节点异常感知器 (联合优化防塌陷)"""
     def __init__(self, in_dim=1433, topo_hidden=64, align_dim=32, num_classes=7):
         super().__init__()
         self.gcn = GCNConv(in_dim, topo_hidden)

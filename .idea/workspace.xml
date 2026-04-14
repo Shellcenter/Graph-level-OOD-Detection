@@ -6,6 +6,13 @@
   <component name="ChangeListManager">
     <list default="true" id="3f6254a1-7afc-4f0e-913a-b109bc8f00a1" name="更改" comment="chore: init project and gitignore">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/generate_graph_ood.py" beforeDir="false" afterPath="$PROJECT_DIR$/generate_graph_ood.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/anomaly_aware.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/anomaly_aware.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/run_analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_cora_benchmark.py" beforeDir="false" afterPath="$PROJECT_DIR$/run_cora_benchmark.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_experiment.py" beforeDir="false" afterPath="$PROJECT_DIR$/run_experiment.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/train_ood_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_ood_model.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -329,7 +336,15 @@
       <option name="project" value="LOCAL" />
       <updated>1775652982866</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="chore: init project and gitignore">
+      <option name="closed" value="true" />
+      <created>1776132866854</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1776132866854</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
