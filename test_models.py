@@ -8,7 +8,7 @@ if proxy_port:
 print("Checking API key access...")
 client = genai.Client(api_key=get_api_key())
 
-# List available Gemini models.
+# 列出当前可用的 Gemini 模型。
 print("Available Gemini models:")
 for model in client.models.list():
     if "gemini" in model.name:

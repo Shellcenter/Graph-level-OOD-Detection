@@ -17,10 +17,10 @@ def set_seed(seed=42):
     np.random.seed(seed)
 
 
-# Model definitions.
+# 模型定义。
 
 class StandardNodeGCN(nn.Module):
-    """GCN baseline with energy-based OOD scoring."""
+    """使用 Energy 分数进行 OOD 检测的 GCN 基线模型。"""
 
     def __init__(self, in_dim=1433, topo_hidden=64, num_classes=7):
         super().__init__()
@@ -33,13 +33,13 @@ class StandardNodeGCN(nn.Module):
 
     def get_energy_score(self, x, edge_index, T=1.0):
         logits = self.forward(x, edge_index)
-        # Higher energy indicates a more anomalous node.
+        # Energy 越高，节点越可能是异常点。
         energy = -T * torch.logsumexp(logits / T, dim=-1)
         return energy
 
 
 class NodeAnomalyAwareModel(nn.Module):
-    """Node-level anomaly-aware model with topology-semantic alignment."""
+    """带拓扑-语义对齐机制的节点级异常感知模型。"""
 
     def __init__(self, in_dim=1433, topo_hidden=64, align_dim=32, num_classes=7):
         super().__init__()
@@ -54,22 +54,22 @@ class NodeAnomalyAwareModel(nn.Module):
         z_topo = self.proj_topo(h_topo)
         z_sem = self.proj_sem(x)
 
-        # Use aligned topology features for node classification.
+        # 使用对齐后的拓扑特征进行节点分类。
         logits = self.classifier(z_topo)
 
-        # Use the representation gap as the anomaly score.
+        # 使用拓扑表示与语义表示之间的差异作为异常分数。
         anomaly_scores = torch.norm(z_topo - z_sem, p=2, dim=-1)
 
         return logits, anomaly_scores, z_topo, z_sem
 
 
-# Evaluation metrics.
+# 评估指标。
 
 def compute_metrics(labels, scores):
-    """Compute AUROC and FPR95 for node-level OOD detection."""
+    """计算节点级 OOD 检测中的 AUROC 和 FPR95。"""
     auc = roc_auc_score(labels, scores)
 
-    # FPR95 is the false-positive rate at 95% true-positive rate.
+    # FPR95 表示在真阳性率达到 95% 时的假阳性率。
     fpr, tpr, _ = roc_curve(labels, scores)
     idx = np.where(tpr >= 0.95)[0]
     fpr95 = fpr[idx[0]] if len(idx) > 0 else 1.0
@@ -77,7 +77,7 @@ def compute_metrics(labels, scores):
     return auc, fpr95
 
 
-# Benchmark pipeline: load data, inject perturbations, train, and evaluate.
+# 基准实验流程：加载数据、注入扰动、训练并评估。
 
 def run_benchmark():
     set_seed(42)
@@ -87,7 +87,7 @@ def run_benchmark():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Computation device: {device}")
 
-    # Load the Cora benchmark dataset.
+    # 加载 Cora 基准数据集。
     print("\nLoading benchmark dataset: Cora...")
     dataset = Planetoid(root='./data', name='Cora', transform=T.NormalizeFeatures())
     data = dataset[0].to(device)
@@ -96,27 +96,27 @@ def run_benchmark():
         f"Features: {data.num_features}"
     )
 
-    # Reserve a subset of test nodes as OOD examples.
+    # 在测试集中划出一部分节点作为 OOD 样本。
     print("\nInjecting OOD perturbations into the test split...")
     test_idx = data.test_mask.nonzero(as_tuple=False).view(-1)
-    # Use the first 200 test nodes as OOD examples.
+    # 取前 200 个测试节点作为 OOD 样本。
     ood_idx = test_idx[:200]
     id_test_idx = test_idx[200:]
 
-    # Shuffle selected node features to simulate semantic inconsistency.
+    # 通过打乱节点特征来模拟语义不一致的异常。
     tampered_x = data.x.clone()
     shuffled_indices = torch.randperm(ood_idx.size(0))
     tampered_x[ood_idx] = data.x[ood_idx[shuffled_indices]]
     data.x_tampered = tampered_x
 
 
-    # Train the baseline model.
+    # 训练基线模型。
 
     print("\nTraining baseline model: Standard GCN (Energy)")
     base_model = StandardNodeGCN(in_dim=dataset.num_features).to(device)
     base_opt = optim.Adam(base_model.parameters(), lr=0.01, weight_decay=5e-4)
 
-    # The baseline is trained with node classification supervision.
+    # 基线模型使用节点分类监督进行训练。
     for epoch in range(100):
         base_model.train()
         base_opt.zero_grad()
@@ -127,9 +127,9 @@ def run_benchmark():
 
     base_model.eval()
     with torch.no_grad():
-        # Evaluate on perturbed node features.
+        # 在加入扰动的节点特征上进行评估。
         energy_scores = base_model.get_energy_score(data.x_tampered, data.edge_index)
-        # Split scores into ID and OOD subsets.
+        # 将分数拆分为 ID 与 OOD 两部分。
         id_scores_base = energy_scores[id_test_idx].cpu().numpy()
         ood_scores_base = energy_scores[ood_idx].cpu().numpy()
 
@@ -139,10 +139,10 @@ def run_benchmark():
     print(f"Baseline results | AUROC: {base_auc * 100:.2f}% | FPR95: {base_fpr95 * 100:.2f}%")
 
 
-    # Train the anomaly-aware model.
+    # 训练异常感知模型。
 
     print("\nTraining model: Anomaly-Aware Model")
-    # Use the dataset class count for the classifier head.
+    # 分类头的类别数与数据集类别数保持一致。
     our_model = NodeAnomalyAwareModel(in_dim=dataset.num_features, num_classes=dataset.num_classes).to(device)
     our_opt = optim.Adam(our_model.parameters(), lr=0.01)
 
@@ -151,13 +151,13 @@ def run_benchmark():
         our_opt.zero_grad()
         logits, scores, z_topo, z_sem = our_model(data.x, data.edge_index)
 
-        # Classification loss is computed on labeled training nodes.
+        # 分类损失只在有标签的训练节点上计算。
         loss_cls = F.cross_entropy(logits[data.train_mask], data.y[data.train_mask])
 
-        # Apply alignment regularization over the full graph.
+        # 在整张图上施加对齐正则项。
         loss_align = nn.MSELoss()(z_topo, z_sem)
 
-        # Joint optimization.
+        # 联合优化分类与对齐目标。
         loss = loss_cls + 1.0 * loss_align
         loss.backward()
         our_opt.step()

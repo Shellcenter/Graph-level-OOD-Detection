@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch_geometric.nn import GCNConv, global_add_pool
 from torch_geometric.utils import softmax
 class StandardNodeGCN(nn.Module):
-    """Standard GCN baseline with energy-based OOD scoring."""
+    """使用 Energy 分数进行 OOD 检测的标准 GCN 基线模型。"""
 
     def __init__(self, in_dim=1433, topo_hidden=64, num_classes=7):
         super().__init__()
@@ -16,6 +16,6 @@ class StandardNodeGCN(nn.Module):
 
     def get_energy_score(self, x, edge_index, T=1.0):
         logits = self.forward(x, edge_index)
-        # Higher energy indicates a more anomalous node.
+        # Energy 越高，节点越可能是异常点。
         energy = -T * torch.logsumexp(logits / T, dim=-1)
         return energy

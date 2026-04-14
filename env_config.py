@@ -11,7 +11,7 @@ load_dotenv()
 
 
 def configure_proxy():
-    """Configure local HTTP(S) proxy settings from the environment."""
+    """根据环境变量配置本地 HTTP(S) 代理。"""
     proxy_port = os.getenv("PROXY_PORT")
     if proxy_port:
         proxy_url = f"http://127.0.0.1:{proxy_port}"
@@ -23,7 +23,7 @@ def configure_proxy():
 
 
 def get_api_key():
-    """Read the API key from the environment."""
+    """从环境变量中读取 API Key。"""
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError(

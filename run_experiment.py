@@ -12,14 +12,14 @@ from google import genai
 from sentence_transformers import SentenceTransformer
 
 
-# Experiment configuration.
+# 实验配置。
 
-NUM_GRAPHS_PER_CLASS = 30  # Total dataset size is 2 * NUM_GRAPHS_PER_CLASS.
+NUM_GRAPHS_PER_CLASS = 30  # 总样本数为 2 * NUM_GRAPHS_PER_CLASS。
 DATASET_PATH = "graph_ood_dataset.pt"
 
 
 def set_seed(seed=42):
-    """Set random seeds for reproducibility."""
+    """设置随机种子，便于结果复现。"""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -41,7 +41,7 @@ def prepare_dataset(device):
     edge_index, node_roles = create_graph_skeleton(num_nodes=5)
 
     dataset = []
-    # Generate in-distribution graphs.
+    # 生成分布内图样本。
     print("\n--- Generating in-distribution (ID) graphs ---")
     for i in range(NUM_GRAPHS_PER_CLASS):
         texts = generate_node_semantics(client, node_roles, is_ood=False)
@@ -49,7 +49,7 @@ def prepare_dataset(device):
         dataset.append(data)
         print(f"  - ID graph {i + 1}/{NUM_GRAPHS_PER_CLASS} generated")
 
-    # Generate out-of-distribution graphs.
+    # 生成分布外图样本。
     print("\n--- Generating out-of-distribution (OOD) graphs ---")
     for i in range(NUM_GRAPHS_PER_CLASS):
         texts = generate_node_semantics(client, node_roles, is_ood=True)
@@ -57,7 +57,7 @@ def prepare_dataset(device):
         dataset.append(data)
         print(f"  - OOD graph {i + 1}/{NUM_GRAPHS_PER_CLASS} generated")
 
-    # Cache the dataset for later runs.
+    # 将数据集缓存到本地，便于后续重复实验。
     torch.save(dataset, DATASET_PATH)
     print(f"\nDataset cached at: {DATASET_PATH}")
     return dataset
@@ -71,22 +71,22 @@ def train_and_evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Computation device: {device}")
 
-    # Prepare the dataset.
+    # 准备数据集。
     full_dataset = prepare_dataset(device)
     random.shuffle(full_dataset)
 
-    # Split into training and test sets.
+    # 划分训练集和测试集。
     split_idx = int(len(full_dataset) * 0.8)
     train_dataset = full_dataset[:split_idx]
     test_dataset = full_dataset[split_idx:]
     print(f"Dataset split completed: {len(train_dataset)} training graphs, {len(test_dataset)} test graphs")
 
-    # Initialize the model and optimizer.
+    # 初始化模型、优化器和损失函数。
     model = AnomalyAwareModel(sem_dim=384, topo_hidden=64, align_dim=32).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.005)
     criterion = nn.BCEWithLogitsLoss()
 
-    # Train with classification and alignment losses.
+    # 使用分类损失和对齐损失进行训练。
     print("\nStarting model training...")
     epochs = 40
     for epoch in range(epochs):
@@ -97,16 +97,16 @@ def train_and_evaluate():
             optimizer.zero_grad()
             batch_index = torch.zeros(data.x.size(0), dtype=torch.long).to(device)
 
-            # Forward pass.
+            # 前向传播。
             logits, alphas, z_topo, z_sem = model(data.x, data.edge_index, batch_index)
 
-            # Primary classification loss.
+            # 主分类损失。
             loss_cls = criterion(logits.unsqueeze(0), data.y.float())
-            # Apply the alignment loss to ID graphs only.
+            # 仅在 ID 图样本上施加对齐损失。
             mse_loss = nn.MSELoss()(z_topo, z_sem)
             loss_align = mse_loss * (1.0 - data.y.float())
 
-            # Joint optimization.
+            # 联合优化。
             loss = loss_cls + 0.5 * loss_align
 
             loss.backward()
@@ -116,7 +116,7 @@ def train_and_evaluate():
         if (epoch + 1) % 10 == 0:
             print(f"Epoch [{epoch + 1:02d}/{epochs}] | Train Loss: {total_loss / len(train_dataset):.4f}")
 
-    # Evaluate on the test split.
+    # 在测试集上评估模型。
     print("\nEvaluation results")
     model.eval()
     all_preds, all_labels = [], []
@@ -127,12 +127,12 @@ def train_and_evaluate():
             batch_index = torch.zeros(data.x.size(0), dtype=torch.long).to(device)
             logits, alphas, _, _ = model(data.x, data.edge_index, batch_index)
 
-            # Convert logits to probabilities.
+            # 将原始分类分数转换为概率。
             prob = torch.sigmoid(logits.unsqueeze(0)).item()
             all_preds.append(prob)
             all_labels.append(data.y.item())
 
-    # Compute summary metrics.
+    # 计算汇总指标。
     acc = accuracy_score(all_labels, [1 if p > 0.5 else 0 for p in all_preds])
     auc = roc_auc_score(all_labels, all_preds)
 

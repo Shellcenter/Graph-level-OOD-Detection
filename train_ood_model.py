@@ -4,71 +4,71 @@ from torch_geometric.nn import GCNConv, global_add_pool
 from torch_geometric.utils import softmax
 
 
-# Graph-level anomaly-aware readout model.
+# 图级异常感知读出模型。
 
 class AnomalyAwareModel(nn.Module):
     def __init__(self, sem_dim=384, topo_hidden=64, align_dim=32):
         super().__init__()
 
-        # Topology encoder.
+        # 拓扑编码器。
         self.gcn = GCNConv(sem_dim, topo_hidden)
 
-        # Modality alignment layers.
+        # 模态对齐层。
         self.proj_topo = nn.Linear(topo_hidden, align_dim)
         self.proj_sem = nn.Linear(sem_dim, align_dim)
 
-        # Mismatch scorer. Input dimension: 32 + 32 + 32 = 96.
+        # 差异评分器，输入维度为 32 + 32 + 32 = 96。
         self.scorer = nn.Sequential(
             nn.Linear(align_dim * 3, 16),
             nn.LeakyReLU(),
             nn.Linear(16, 1)
         )
 
-        # Graph-level classifier.
+        # 图级分类器。
         self.classifier = nn.Linear(topo_hidden, 1)
 
     def forward(self, x_sem, edge_index, batch_index):
         """
-        Args:
-            x_sem: Node semantic features with shape [N, 384].
-            edge_index: Graph connectivity in COO format.
-            batch_index: Graph assignment for each node.
+        参数：
+            x_sem: 节点语义特征，形状为 [N, 384]。
+            edge_index: 图的 COO 格式连边信息。
+            batch_index: 每个节点所属图的批索引。
         """
-        # Step 1: extract topology-aware features.
+        # 第一步：提取包含拓扑信息的节点表示。
         h_topo = self.gcn(x_sem, edge_index).relu()
 
-        # Step 2: align topology and semantic representations.
+        # 第二步：对齐拓扑表示与语义表示。
         z_topo = self.proj_topo(h_topo)
         z_sem = self.proj_sem(x_sem)
 
-        # Step 3: score representation mismatch at the node level.
+        # 第三步：在节点级别计算表示差异分数。
         diff = torch.abs(z_topo - z_sem)
         concat_feat = torch.cat([z_topo, z_sem, diff], dim=-1)
         s_i = self.scorer(concat_feat)
 
-        # Step 4: aggregate graph features with node-wise attention.
+        # 第四步：结合节点注意力进行图级聚合。
         alpha = softmax(s_i, batch_index)
         weighted_h = h_topo * alpha
         z_graph = global_add_pool(weighted_h, batch_index)
 
-        # Graph-level logits.
+        # 输出图级分类原始分数。
         logits = self.classifier(z_graph)
         return logits.squeeze(), alpha, z_topo, z_sem
 
 
-# Minimal forward-pass smoke test.
+# 最小前向传播连通性测试。
 
 if __name__ == "__main__":
     print("Initializing Anomaly-Aware Readout model...")
     model = AnomalyAwareModel(sem_dim=384, topo_hidden=64, align_dim=32)
 
-    # Create a small synthetic graph for a quick forward-pass test.
+    # 构造一张小型合成图用于快速前向测试。
     dummy_x = torch.randn(5, 384)
     dummy_edge_index = torch.tensor([[0, 0, 0, 0, 1, 2, 3, 4],
                                      [1, 2, 3, 4, 0, 0, 0, 0]], dtype=torch.long)
     dummy_batch = torch.zeros(5, dtype=torch.long)
 
-    # Forward-pass test.
+    # 前向传播测试。
     logits, alphas, _, _ = model(dummy_x, dummy_edge_index, dummy_batch)
 
     print("\nForward pass completed successfully.")
@@ -77,20 +77,20 @@ if __name__ == "__main__":
     print("\nThe model is ready for integration with the generated graph dataset.")
 
 
-# Standard GCN baseline used for comparison.
+# 用于对比的标准 GCN 基线模型。
 
 class StandardGCN(nn.Module):
     def __init__(self, sem_dim=384, topo_hidden=64):
         super().__init__()
         self.gcn = GCNConv(sem_dim, topo_hidden)
-        # Plain classifier without alignment or attention weighting.
+        # 不包含对齐项与注意力加权的简单分类器。
         self.classifier = nn.Linear(topo_hidden, 1)
 
     def forward(self, x_sem, edge_index, batch_index):
-        # Step 1: extract node features.
+        # 第一步：提取节点特征。
         h = self.gcn(x_sem, edge_index).relu()
-        # Step 2: global pooling.
+        # 第二步：全局池化得到图表示。
         z_graph = global_add_pool(h, batch_index)
-        # Step 3: graph classification.
+        # 第三步：进行图级分类。
         logits = self.classifier(z_graph)
         return logits.squeeze()
