@@ -94,16 +94,19 @@ def compute_metrics(labels, scores):
 def run_benchmark():
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f">>> [硬件探针] 当前设备: {device}")
+    print(f">>> Computation device: {device}")
 
     # 1. 自动下载并加载真实的 Cora 数据集
-    print("\n>>> 正在拉取真实基准数据集 Cora...")
+    print("\n>>> Loading benchmark dataset: Cora...")
     dataset = Planetoid(root='./data', name='Cora', transform=T.NormalizeFeatures())
     data = dataset[0].to(device)
-    print(f"Cora 节点数: {data.num_nodes}, 连边数: {data.edge_index.size(1)}, 特征维数: {data.num_features}")
+    print(
+        f"Cora statistics | Nodes: {data.num_nodes}, Edges: {data.edge_index.size(1)}, "
+        f"Features: {data.num_features}"
+    )
 
     # 2. 构造高伪装的单点 OOD 异常 (模拟洗钱篡改)
-    print("\n>>> 正在注入隐蔽 OOD 变异节点...")
+    print("\n>>> Injecting stealth OOD perturbations into the test split...")
     test_idx = data.test_mask.nonzero(as_tuple=False).view(-1)
     # 取测试集的前 200 个节点作为 OOD
     ood_idx = test_idx[:200]
@@ -118,7 +121,7 @@ def run_benchmark():
     # ==============================================
     # 评估基线：Standard GCN (Energy-based OOD Detection)
     # ==============================================
-    print("\n================ [训练炮灰：Standard GCN (Energy)] ================")
+    print("\n================ [Training Baseline: Standard GCN (Energy)] ================")
     base_model = StandardNodeGCN(in_dim=dataset.num_features).to(device)
     base_opt = optim.Adam(base_model.parameters(), lr=0.01, weight_decay=5e-4)
 
@@ -142,12 +145,12 @@ def run_benchmark():
     labels_base = np.concatenate([np.zeros(len(id_scores_base)), np.ones(len(ood_scores_base))])
     scores_base = np.concatenate([id_scores_base, ood_scores_base])
     base_auc, base_fpr95 = compute_metrics(labels_base, scores_base)
-    print(f"炮灰最终成绩 -> AUROC: {base_auc * 100:.2f}% | FPR95: {base_fpr95 * 100:.2f}% (越高代表越瞎)")
+    print(f"Baseline results | AUROC: {base_auc * 100:.2f}% | FPR95: {base_fpr95 * 100:.2f}%")
 
     # ==============================================
     # 评估我们：Anomaly-Aware Model (联合训练版)
     # ==============================================
-    print("\n================ [训练主角：Anomaly-Aware Model (Ours)] ================")
+    print("\n================ [Training Model: Anomaly-Aware Model (Ours)] ================")
     # 传入类别数 7 (Cora的数据集特性)
     our_model = NodeAnomalyAwareModel(in_dim=dataset.num_features, num_classes=dataset.num_classes).to(device)
     our_opt = optim.Adam(our_model.parameters(), lr=0.01)
@@ -178,9 +181,12 @@ def run_benchmark():
     labels_our = np.concatenate([np.zeros(len(id_scores_our)), np.ones(len(ood_scores_our))])
     scores_our = np.concatenate([id_scores_our, ood_scores_our])
     our_auc, our_fpr95 = compute_metrics(labels_our, scores_our)
-    print(f"主角最终成绩 -> AUROC: {our_auc * 100:.2f}% | FPR95: {our_fpr95 * 100:.2f}% (越低代表越准！)")
+    print(f"Anomaly-Aware results | AUROC: {our_auc * 100:.2f}% | FPR95: {our_fpr95 * 100:.2f}%")
 
-    print("\n✨ 实验结论：在 2708 个节点的真实图网络中，面对高度伪装的单点变异，Ours 成功完成了降维打击！")
+    print(
+        "\nConclusion: On the Cora benchmark with stealth semantic perturbations, "
+        "the anomaly-aware model outperforms the energy-based baseline."
+    )
 
 
 if __name__ == "__main__":

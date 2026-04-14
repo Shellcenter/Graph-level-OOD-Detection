@@ -24,7 +24,7 @@ def set_seed(seed=42):
 
 def evaluate_model(model_name, model, train_dataset, test_dataset, device, is_anomaly_aware=False):
     """通用的模型训练与评估函数"""
-    print(f"\n================ [ 正在训练 {model_name} ] ================")
+    print(f"\n================ [ Training {model_name} ] ================")
     optimizer = optim.Adam(model.parameters(), lr=0.005)
     criterion = nn.BCEWithLogitsLoss()
     epochs = 40
@@ -67,13 +67,13 @@ def evaluate_model(model_name, model, train_dataset, test_dataset, device, is_an
             all_labels.append(data.y.item())
 
     auc = roc_auc_score(all_labels, all_preds)
-    print(f"[{model_name}] 最终 AUROC 测试成绩: {auc * 100:.2f}%")
+    print(f"[{model_name}] Final test AUROC: {auc * 100:.2f}%")
     return model
 
 
 def plot_attention_heatmap(model, dataset, device):
     """高逼格论文插图生成器：画出注意力的降维打击"""
-    print("\n>>> 🎨 正在渲染注意力热力图 (Attention Heatmap)...")
+    print("\n>>> Rendering attention heatmap...")
     model.eval()
 
     # 找出一张 Hard OOD 图 (y == 1)
@@ -115,7 +115,7 @@ def plot_attention_heatmap(model, dataset, device):
 
     # 保存图片
     plt.savefig("attention_heatmap.png", dpi=300, bbox_inches='tight')
-    print("✅ 图片已成功保存为 'attention_heatmap.png'，请在左侧文件栏查看！")
+    print("Figure saved to 'attention_heatmap.png'.")
     plt.show()
 
 

@@ -63,28 +63,29 @@ def setup_logger(args):
 def main():
     # 1. 严肃的参数解析 (Argparse)
     parser = argparse.ArgumentParser(description="Graph OOD Detection Benchmark")
-    parser.add_argument("--dataset", type=str, default="Cora", help="数据集名称")
-    parser.add_argument("--lr", type=float, default=0.01, help="学习率")
-    parser.add_argument("--epochs", type=int, default=100, help="训练轮数")
-    parser.add_argument("--ood_ratio", type=float, default=0.2, help="OOD变异比例")
+    parser.add_argument("--dataset", type=str, default="Cora", help="Dataset name")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
+    parser.add_argument("--ood_ratio", type=float, default=0.2, help="OOD corruption ratio in the test split")
     args = parser.parse_args()
 
     # 2. 专业的日志输出系统
     log_file_path = setup_logger(args)
-    logging.info(f"📜 本次实验的黑匣子已开启，记录将自动保存在: {log_file_path}")
-    logging.info(f"🚀 正在启动实验 | 数据集: {args.dataset} | 学习率: {args.lr} | 轮数: {args.epochs}")
-    logging.info(f"🚀 正在启动实验 | 数据集: {args.dataset} | 学习率: {args.lr} | 轮数: {args.epochs}")
+    logging.info(f"Experiment logging initialized. Records will be saved to: {log_file_path}")
+    logging.info(
+        f"Starting experiment | Dataset: {args.dataset} | Learning rate: {args.lr} | Epochs: {args.epochs}"
+    )
 
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logging.info(f"💻 硬件探针激活 | 当前计算设备: {device}")
+    logging.info(f"Computation device: {device}")
 
     # 3. 数据加载与高危变异注入
-    logging.info("📂 正在拉取真实基准数据集...")
+    logging.info("Loading benchmark dataset...")
     dataset = Planetoid(root='./data', name=args.dataset, transform=T.NormalizeFeatures())
     data = dataset[0].to(device)
 
-    logging.info("💉 正在向测试集注入隐蔽 OOD 变异节点...")
+    logging.info("Injecting stealth OOD perturbations into the test split...")
     test_idx = data.test_mask.nonzero(as_tuple=False).view(-1)
     ood_num = int(len(test_idx) * args.ood_ratio)
     ood_idx = test_idx[:ood_num]
@@ -97,12 +98,12 @@ def main():
     data.x_tampered = tampered_x
 
     # 4. 初始化主角模型
-    logging.info("🏗️ 正在初始化 Anomaly-Aware 核心架构...")
+    logging.info("Initializing the Anomaly-Aware model...")
     our_model = NodeAnomalyAwareModel(in_dim=dataset.num_features, num_classes=dataset.num_classes).to(device)
     our_opt = optim.Adam(our_model.parameters(), lr=args.lr)
 
     # 5. 训练循环 (自监督联合优化)
-    logging.info("🔥 开始全图无监督对齐训练...")
+    logging.info("Starting joint training with full-graph alignment...")
     for epoch in range(1, args.epochs + 1):
         our_model.train()
         our_opt.zero_grad()
@@ -119,7 +120,7 @@ def main():
             logging.info(f"   Epoch [{epoch:03d}/{args.epochs}] | Total Loss: {loss.item():.4f}")
 
     # 6. 评估与跑分
-    logging.info("🧪 正在测试集上执行降维打击验证...")
+    logging.info("Evaluating on the tampered test split...")
     our_model.eval()
     with torch.no_grad():
         _, our_scores, _, _ = our_model(data.x_tampered, data.edge_index)
@@ -133,9 +134,9 @@ def main():
     our_auc, our_fpr95 = compute_metrics(labels_our, scores_our)
 
     logging.info("=" * 50)
-    logging.info(f"🏆 主角最终成绩 -> AUROC: {our_auc * 100:.2f}% | FPR95: {our_fpr95 * 100:.2f}%")
+    logging.info(f"Final results | AUROC: {our_auc * 100:.2f}% | FPR95: {our_fpr95 * 100:.2f}%")
     logging.info("=" * 50)
-    logging.info("✅ 实验结束，所有进程已安全退出。")
+    logging.info("Experiment finished successfully.")
 
 
 if __name__ == "__main__":

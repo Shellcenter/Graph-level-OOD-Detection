@@ -9,11 +9,11 @@ os.environ['https_proxy'] = f'http://127.0.0.1:{PROXY_PORT}'
 # 2. 填入你的钥匙
 API_KEY = "AIzaSyBwB5Vft5rqw8l87bl0e3KmUteacVqsY_A"
 
-print(">>> 正在探测你的 API Key 权限...")
+print(">>> Checking API key access...")
 client = genai.Client(api_key=API_KEY)
 
 # 3. 强制拉取可用模型清单！
-print("✅ 你目前在代码里可以调用的模型有：")
+print("Available Gemini models:")
 for model in client.models.list():
     if "gemini" in model.name:
         print(f" - {model.name}")

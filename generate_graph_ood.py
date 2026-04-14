@@ -82,20 +82,20 @@ def generate_node_semantics(client, node_roles, is_ood=False):
         temperature=0.7,
     )
 
-    print(f"\n[导师探针] 正在向 Gemini 3.1 Flash 发送请求 (生成 {'OOD' if is_ood else 'ID'} 数据)...")
+    print(f"\n[Generation] Sending request to Gemini 3.1 Flash ({'OOD' if is_ood else 'ID'} sample)...")
     response = client.models.generate_content(
         model='gemini-3.1-flash-lite-preview',  # ⚡ 启用 3.1 世代的极速轻量引擎
         contents=prompt,
         config=config,
     )
-    print("[导师探针] ⚡ 云端响应成功！")
+    print("[Generation] Response received successfully.")
 
     # 解析 JSON
     try:
         text_data = json.loads(response.text)
         return text_data
     except json.JSONDecodeError:
-        raise ValueError("Gemini 未返回合法的 JSON，解析失败！请重试。")
+        raise ValueError("Gemini did not return valid JSON. Please retry.")
 
 
 # =====================================================================
@@ -110,7 +110,7 @@ def build_pyg_data(edge_index, text_data, encoder, y_label):
     texts = [text_data[str(i)] for i in range(num_nodes)]
 
     # 文本转张量
-    print(f"[张量引擎] 正在使用 SentenceTransformer 编码 {num_nodes} 个节点的语义...")
+    print(f"[Encoding] Encoding semantic descriptions for {num_nodes} nodes with SentenceTransformer...")
     x = encoder.encode(texts, convert_to_tensor=True)  # [num_nodes, embed_dim]
 
     # 构建 Data 对象
@@ -125,7 +125,7 @@ def build_pyg_data(edge_index, text_data, encoder, y_label):
 # 主流程：点火运行
 # =====================================================================
 if __name__ == "__main__":
-    print(">>> 启动图级 OOD 数据生成管道...")
+    print(">>> Starting graph-level OOD data generation pipeline...")
 
     # 1. 初始化客户端和模型
     gemini_client = genai.Client(api_key=API_KEY)
@@ -133,24 +133,24 @@ if __name__ == "__main__":
 
     # 2. 生成物理骨架 (固定)
     edge_index, node_roles = create_graph_skeleton(num_nodes=5)
-    print("\n--- 图拓扑骨架已生成 ---")
+    print("\n--- Graph topology skeleton generated ---")
     for k, v in node_roles.items():
         print(f"Node {k}: {v}")
 
     # 3. 合成 ID 图 (标签 0)
-    print("\n================ [开始合成分布内 (ID) 图] ================")
+    print("\n================ [Synthesizing In-Distribution (ID) Graph] ================")
     id_texts = generate_node_semantics(gemini_client, node_roles, is_ood=False)
     id_data = build_pyg_data(edge_index, id_texts, text_encoder, y_label=0)
-    print(f"✅ ID 图构建完成！特征维度: {id_data.x.shape}")
+    print(f"ID graph constructed. Feature shape: {id_data.x.shape}")
 
     # 4. 合成 Hard OOD 图 (标签 1)
-    print("\n================ [开始合成分布外 (Hard OOD) 图] ================")
+    print("\n================ [Synthesizing Out-of-Distribution (Hard OOD) Graph] ================")
     ood_texts = generate_node_semantics(gemini_client, node_roles, is_ood=True)
     ood_data = build_pyg_data(edge_index, ood_texts, text_encoder, y_label=1)
-    print(f"✅ OOD 图构建完成！特征维度: {ood_data.x.shape}")
+    print(f"OOD graph constructed. Feature shape: {ood_data.x.shape}")
 
     # 5. 学术验收：打印 OOD 图的篡改文本
-    print("\n🔍 [学术验收] Hard OOD 图的节点语义：")
+    print("\n[Inspection] Node semantics in the Hard OOD graph:")
     for i in range(5):
-        prefix = "🔴 [边缘变异]" if i > 0 else "🟢 [中心正常]"
+        prefix = "[Perturbed Edge Node]" if i > 0 else "[Normal Central Node]"
         print(f"Node {i} {prefix}: {ood_data.raw_texts[i]}")

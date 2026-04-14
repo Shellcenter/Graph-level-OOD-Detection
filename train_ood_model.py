@@ -61,7 +61,7 @@ class AnomalyAwareModel(nn.Module):
 # 探针测试：连通性验证
 # =====================================================================
 if __name__ == "__main__":
-    print(">>> 正在初始化 Anomaly-Aware Readout 模型...")
+    print(">>> Initializing Anomaly-Aware Readout model...")
     model = AnomalyAwareModel(sem_dim=384, topo_hidden=64, align_dim=32)
 
     # 伪造一张 5 节点的图进行连通性测试 (模拟刚才跑出的数据)
@@ -71,12 +71,12 @@ if __name__ == "__main__":
     dummy_batch = torch.zeros(5, dtype=torch.long)  # 这 5 个节点都属于第 0 张图
 
     # 前向传播测试
-    logits, alphas = model(dummy_x, dummy_edge_index, dummy_batch)
+    logits, alphas, _, _ = model(dummy_x, dummy_edge_index, dummy_batch)
 
-    print("\n✅ 模型前向传播成功！")
-    print(f"图级预测输出 (Logits): {logits.item():.4f}")
-    print(f"注意力权重分布 (Alphas): \n{alphas.detach().numpy()}")
-    print("\n准备好将 generate_graph_ood.py 的真实数据接入进来了吗？")
+    print("\nForward pass completed successfully.")
+    print(f"Graph-level logit: {logits.item():.4f}")
+    print(f"Attention weights (alphas):\n{alphas.detach().numpy()}")
+    print("\nThe model is ready for integration with the generated graph dataset.")
 
 
 # =====================================================================
