@@ -1,27 +1,46 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
 
-class NodeAnomalyAwareModel(nn.Module):
-    """带联合分类与对齐机制的节点级异常感知模型。"""
-    def __init__(self, in_dim=1433, topo_hidden=64, align_dim=32, num_classes=7):
-        super().__init__()
-        self.gcn = GCNConv(in_dim, topo_hidden)
-        self.proj_topo = nn.Linear(topo_hidden, align_dim)
-        self.proj_sem = nn.Linear(in_dim, align_dim)
-        # 分类头用于为表示学习提供监督锚点。
-        self.classifier = nn.Linear(align_dim, num_classes)
+class DualStreamOODDetector(nn.Module):
+    def __init__(self, topo_in_dim, sem_in_dim, hidden_dim, z_dim):
+        super(DualStreamOODDetector, self).__init__()
 
-    def forward(self, x, edge_index):
-        h_topo = self.gcn(x, edge_index).relu()
-        z_topo = self.proj_topo(h_topo)
-        z_sem = self.proj_sem(x)
+        # 拓扑流: GNN Backbone
+        self.conv1 = GCNConv(topo_in_dim, hidden_dim)
+        self.conv2 = GCNConv(hidden_dim, hidden_dim)
 
-        # 使用对齐后的拓扑特征进行节点分类。
-        logits = self.classifier(z_topo)
+        # 语义流: 假设外部已提供 LLM 特征，直接映射
 
-        # 使用拓扑表示与语义表示之间的差异作为异常分数。
-        anomaly_scores = torch.norm(z_topo - z_sem, p=2, dim=-1)
+        # 跨空间投影头 (Phase 1.5)
+        self.mlp_topo = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, z_dim)
+        )
 
-        return logits, anomaly_scores, z_topo, z_sem
+        self.mlp_sem = nn.Sequential(
+            nn.Linear(sem_in_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, z_dim)
+        )
+
+    def forward(self, x_topo, edge_index, h_sem):
+        # 提取拓扑特征 (受网络结构平滑影响)
+        h_topo = F.relu(self.conv1(x_topo, edge_index))
+        h_topo = self.conv2(h_topo, edge_index)
+
+        # 映射至统一隐藏空间并进行 L2 归一化
+        z_topo = F.normalize(self.mlp_topo(h_topo), p=2, dim=1)
+        z_sem = F.normalize(self.mlp_sem(h_sem), p=2, dim=1)
+
+        return z_topo, z_sem
+
+    def compute_anomaly_score(self, z_topo, z_sem):
+        # 计算结构与语义的对齐残差 (||ΔZ||_2)
+        residual = z_topo - z_sem
+        return torch.norm(residual, p=2, dim=1)
